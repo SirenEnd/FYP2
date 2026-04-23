@@ -1,0 +1,160 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── DEPARTMENT ───────────────────────────────
+model Department {
+  id        Int        @id @default(autoincrement())
+  name      String     @unique
+  createdAt DateTime   @default(now())
+  employees Employee[]
+}
+
+// ─── EMPLOYEE ─────────────────────────────────
+model Employee {
+  id           Int        @id @default(autoincrement())
+  employeeId   String     @unique  // e.g. RST-001
+  name         String
+  email        String     @unique
+  password     String
+  phone        String?
+  role         Role       @default(STAFF)
+  position     String?    // e.g. "Head Chef", "Waiter"
+  salary       Float      @default(0)
+  departmentId Int
+  department   Department @relation(fields: [departmentId], references: [id])
+  isActive     Boolean    @default(true)
+  joinDate     DateTime   @default(now())
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  // Relations
+  attendances  Attendance[]
+  schedules    Schedule[]
+  leaveRequests LeaveRequest[]
+  payrolls     Payroll[]
+  performances Performance[]
+}
+
+enum Role {
+  STAFF
+  SUPERVISOR
+  ADMIN
+}
+
+// ─── ATTENDANCE ───────────────────────────────
+model Attendance {
+  id         Int       @id @default(autoincrement())
+  employeeId Int
+  employee   Employee  @relation(fields: [employeeId], references: [id])
+  clockIn    DateTime
+  clockOut   DateTime?
+  breakStart DateTime?
+  breakEnd   DateTime? 
+  totalHours Float?
+  status     AttendanceStatus @default(PRESENT)
+  date       DateTime  @default(now())
+  createdAt  DateTime  @default(now())
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  ON_LEAVE
+}
+
+// ─── SCHEDULE ─────────────────────────────────
+model Schedule {
+  id           Int      @id @default(autoincrement())
+  employeeId   Int
+  employee     Employee @relation(fields: [employeeId], references: [id])
+  shiftDate    DateTime
+  shiftStart   String   // e.g. "08:00"
+  shiftEnd     String   // e.g. "17:00"
+  station      String?  // e.g. "Kitchen Station A"
+  status       ScheduleStatus @default(SCHEDULED)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+enum ScheduleStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  SWAPPED
+}
+
+// ─── LEAVE REQUEST ────────────────────────────
+model LeaveRequest {
+  id           Int         @id @default(autoincrement())
+  employeeId   Int
+  employee     Employee    @relation(fields: [employeeId], references: [id])
+  leaveType    LeaveType
+  startDate    DateTime
+  endDate      DateTime
+  totalDays    Int
+  reason       String?
+  status       LeaveStatus @default(PENDING)
+  reviewedBy   Int?        // supervisor/admin employee id
+  reviewedAt   DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+}
+
+enum LeaveType {
+  ANNUAL
+  MEDICAL
+  EMERGENCY
+  UNPAID
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// ─── PAYROLL ──────────────────────────────────
+model Payroll {
+  id              Int      @id @default(autoincrement())
+  employeeId      Int
+  employee        Employee @relation(fields: [employeeId], references: [id])
+  month           Int      // 1-12
+  year            Int
+  basicSalary     Float
+  overtimeHours   Float    @default(0)
+  overtimePay     Float    @default(0)
+  serviceCharge   Float    @default(0)
+  epfDeduction    Float    @default(0)  // 11% employee contribution
+  socsoDeduction  Float    @default(0)
+  grossSalary     Float
+  netSalary       Float
+  status          PayrollStatus @default(PENDING)
+  paidAt          DateTime?
+  createdAt       DateTime @default(now())
+}
+
+enum PayrollStatus {
+  PENDING
+  PROCESSED
+  PAID
+}
+
+// ─── PERFORMANCE ──────────────────────────────
+model Performance {
+  id           Int      @id @default(autoincrement())
+  employeeId   Int
+  employee     Employee @relation(fields: [employeeId], references: [id])
+  reviewerId   Int
+  score        Float    // out of 5.0
+  comments     String?
+  quarter      Int      // 1-4
+  year         Int
+  createdAt    DateTime @default(now())
+}
