@@ -41,7 +41,7 @@ const login = async (req, res) => {
         departmentId: employee.departmentId
       },
       process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN }
+      { expiresIn:'7d'}
     )
 
     // Return token + safe employee data
