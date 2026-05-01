@@ -1,11 +1,9 @@
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: 'http://localhost:5000/api',
-  withCredentials: true,  // Add this line
-  headers: {
-    'Content-Type': 'application/json'
-  }
+  baseURL: 'https://restrohrms-backend.onrender.com/api',  // Live backend
+  // baseURL: 'http://localhost:5000/api',  // Local development
+  headers: { 'Content-Type': 'application/json' }
 })
 
 api.interceptors.request.use(
