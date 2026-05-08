@@ -3,10 +3,10 @@ const express = require('express')
 const cors = require('cors')
 const app = express()
 
-// Middleware - FIXED CORS
+// Middleware
 app.use(cors({
-  origin: 'http://localhost:5173',  // Your frontend URL
-  credentials: true,                 // Important for auth
+  origin: ['http://localhost:5173', 'http://localhost:3000'],
+  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }))
@@ -18,23 +18,23 @@ const authRoutes = require('./routes/auth.routes')
 const employeeRoutes = require('./routes/employee.routes')
 const departmentRoutes = require('./routes/department.routes')
 const attendanceRoutes = require('./routes/attendance.routes')
-const scheduleRoutes = require('./routes/schedule.routes')
+const leaveRoutes = require('./routes/leave.routes')
 const payrollRoutes = require('./routes/payroll.routes')
+const branchRoutes = require('./routes/branch.routes')
+const timetableRoutes = require('./routes/timetable.routes')
 
 app.use('/api/auth', authRoutes)
 app.use('/api/employees', employeeRoutes)
 app.use('/api/departments', departmentRoutes)
 app.use('/api/attendance', attendanceRoutes)
-app.use('/api/schedule', scheduleRoutes)
+app.use('/api/leave', leaveRoutes)
 app.use('/api/payroll', payrollRoutes)
+app.use('/api/branches', branchRoutes)
+app.use('/api/timetable', timetableRoutes)
 
 // Health check
 app.get('/', (req, res) => {
-  res.json({
-    message: 'RestroHR API is running',
-    version: '1.0.0',
-    status: 'OK'
-  })
+  res.json({ message: 'RestroHR API is running', version: '1.0.0', status: 'OK' })
 })
 
 // 404 handler
