@@ -1,34 +1,37 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import api from '../../services/api'
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-const HOURS = Array.from({ length: 17 }, (_, i) => i + 7) // 7am to 11pm
+const HOURS = Array.from({ length: 17 }, (_, i) => i + 7)
 
-const POSITION_GROUPS = {
-  'Kitchen Staff': ['Kitchen Staff', 'Head Chef', 'Sous Chef', 'Cook', 'Kitchen Crew'],
-  'Service Crew': ['Service Crew', 'Waiter', 'Waitress', 'Cashier', 'Front Counter'],
-  'Supervisor': ['Supervisor', 'Kitchen Supervisor', 'Floor Supervisor'],
-  'Management': ['Admin', 'Manager', 'System Administrator'],
-  'Other': []
-}
-
-const getDefaultStation = (position, role) => {
-  const pos = (position || '').toLowerCase()
-  if (pos.includes('kitchen') || pos.includes('chef') || pos.includes('cook')) return 'Kitchen'
-  if (pos.includes('service') || pos.includes('waiter') || pos.includes('waitress') ||
-      pos.includes('cashier') || pos.includes('counter')) return 'Service'
-  return ''
+// Color per position group
+const POSITION_COLORS = {
+  'Kitchen Staff': { bg: 'bg-orange-500', light: 'bg-orange-50', ring: 'ring-orange-400', text: 'text-orange-700', badge: 'bg-orange-100 text-orange-700' },
+  'Service Crew':  { bg: 'bg-blue-500',   light: 'bg-blue-50',   ring: 'ring-blue-400',   text: 'text-blue-700',   badge: 'bg-blue-100 text-blue-700' },
+  'Supervisor':    { bg: 'bg-purple-500',  light: 'bg-purple-50', ring: 'ring-purple-400',  text: 'text-purple-700', badge: 'bg-purple-100 text-purple-700' },
+  'Management':    { bg: 'bg-red-500',     light: 'bg-red-50',    ring: 'ring-red-400',     text: 'text-red-700',    badge: 'bg-red-100 text-red-700' },
+  'Other':         { bg: 'bg-gray-500',    light: 'bg-gray-50',   ring: 'ring-gray-400',    text: 'text-gray-700',   badge: 'bg-gray-100 text-gray-700' },
 }
 
 const getPositionGroup = (employee) => {
-  const pos = employee.position || ''
-  for (const [group, keywords] of Object.entries(POSITION_GROUPS)) {
-    if (group === 'Other') continue
-    if (keywords.some(k => pos.toLowerCase().includes(k.toLowerCase()))) return group
-  }
-  if (employee.role === 'SUPERVISOR') return 'Supervisor'
-  if (employee.role === 'ADMIN') return 'Management'
+  const pos = (employee.position || '').toLowerCase()
+  if (pos.includes('kitchen') || pos.includes('chef') || pos.includes('cook')) return 'Kitchen Staff'
+  if (pos.includes('service') || pos.includes('waiter') || pos.includes('waitress') || pos.includes('cashier') || pos.includes('counter')) return 'Service Crew'
+  if (employee.role === 'SUPERVISOR' || pos.includes('supervisor')) return 'Supervisor'
+  if (employee.role === 'ADMIN' || pos.includes('manager') || pos.includes('admin')) return 'Management'
   return 'Other'
+}
+
+const getDefaultStation = (position) => {
+  const pos = (position || '').toLowerCase()
+  if (pos.includes('kitchen') || pos.includes('chef') || pos.includes('cook')) return 'Kitchen'
+  if (pos.includes('service') || pos.includes('waiter') || pos.includes('waitress') || pos.includes('cashier') || pos.includes('counter')) return 'Service'
+  return ''
+}
+
+const getSlotColor = (employee) => {
+  const group = getPositionGroup(employee)
+  return POSITION_COLORS[group] || POSITION_COLORS['Other']
 }
 
 const ScheduleManager = () => {
@@ -47,6 +50,9 @@ const ScheduleManager = () => {
   const [searchName, setSearchName] = useState('')
   const [newTimetable, setNewTimetable] = useState({ name: '', effectiveFrom: '' })
   const [newBranch, setNewBranch] = useState({ name: '', address: '' })
+  const [dragSource, setDragSource] = useState(null)   // {dayIndex, hour}
+  const [dragOver, setDragOver] = useState(null)       // {dayIndex, hour}
+  const [copying, setCopying] = useState(false)
 
   useEffect(() => { fetchBranches(); fetchEmployees() }, [])
   useEffect(() => { if (selectedBranch) fetchTimetable(selectedBranch) }, [selectedBranch])
@@ -77,28 +83,72 @@ const ScheduleManager = () => {
     } finally { setLoading(false) }
   }
 
-  const handleCreateBranch = async (e) => {
-    e.preventDefault()
-    try {
-      await api.post('/branches', newBranch)
-      setShowBranchForm(false)
-      setNewBranch({ name: '', address: '' })
-      fetchBranches()
-    } catch (err) { alert(err.response?.data?.error || 'Failed to create branch') }
+  const getCellSlots = (dayIndex, hour) => {
+    if (!grid[dayIndex]) return []
+    return grid[dayIndex]?.hours?.find(h => h.hour === hour)?.slots || []
   }
 
-  const handleCreateTimetable = async (e) => {
-    e.preventDefault()
-    try {
-      await api.post('/timetable', { branchId: selectedBranch, ...newTimetable })
-      setShowCreateForm(false)
-      setNewTimetable({ name: '', effectiveFrom: '' })
-      fetchTimetable(selectedBranch)
-    } catch (err) { alert(err.response?.data?.error || 'Failed to create timetable') }
+  // ── DRAG HANDLERS ──────────────────────────────────────────────
+  const handleDragStart = (e, dayIndex, hour) => {
+    const slots = getCellSlots(dayIndex, hour)
+    if (slots.length === 0) { e.preventDefault(); return }
+    setDragSource({ dayIndex, hour })
+    e.dataTransfer.effectAllowed = 'copy'
+    e.dataTransfer.setData('text/plain', JSON.stringify({ dayIndex, hour }))
   }
 
+  const handleDragOver = (e, dayIndex, hour) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'copy'
+    setDragOver({ dayIndex, hour })
+  }
+
+  const handleDragLeave = () => setDragOver(null)
+
+  const handleDrop = async (e, targetDay, targetHour) => {
+    e.preventDefault()
+    setDragOver(null)
+
+    if (!dragSource) return
+    const { dayIndex: srcDay, hour: srcHour } = dragSource
+
+    // Same cell — ignore
+    if (srcDay === targetDay && srcHour === targetHour) { setDragSource(null); return }
+
+    const srcSlots = getCellSlots(srcDay, srcHour)
+    if (srcSlots.length === 0) { setDragSource(null); return }
+
+    setCopying(true)
+    try {
+      for (const slot of srcSlots) {
+        // Skip if employee already assigned to target cell
+        const targetSlots = getCellSlots(targetDay, targetHour)
+        const alreadyThere = targetSlots.some(s => s.employee.id === slot.employee.id)
+        if (alreadyThere) continue
+
+        await api.post(`/timetable/${timetable.id}/slot`, {
+          employeeId: slot.employee.id,
+          dayOfWeek: targetDay,
+          startHour: targetHour,
+          endHour: targetHour + 1,
+          station: slot.station
+        })
+      }
+      await fetchTimetable(selectedBranch)
+    } catch (err) {
+      console.error('Copy failed:', err)
+      alert(err.response?.data?.error || 'Some slots could not be copied')
+    } finally {
+      setCopying(false)
+      setDragSource(null)
+    }
+  }
+
+  const handleDragEnd = () => { setDragSource(null); setDragOver(null) }
+
+  // ── ASSIGN / REMOVE ────────────────────────────────────────────
   const handleCellClick = (dayIndex, hour) => {
-    if (!timetable) return
+    if (!timetable || dragSource) return
     setSelectedCell({ dayIndex, hour })
     setSelectedEmployee('')
     setSelectedStation('')
@@ -109,7 +159,7 @@ const ScheduleManager = () => {
   const handleEmployeeSelect = (empId) => {
     setSelectedEmployee(empId)
     const emp = employees.find(e => e.id === parseInt(empId))
-    if (emp) setSelectedStation(getDefaultStation(emp.position, emp.role))
+    if (emp) setSelectedStation(getDefaultStation(emp.position))
   }
 
   const handleAssignSlot = async () => {
@@ -136,7 +186,27 @@ const ScheduleManager = () => {
     } catch (err) { alert('Failed to remove slot') }
   }
 
-  // Group employees by position for the selector
+  const handleCreateBranch = async (e) => {
+    e.preventDefault()
+    try {
+      await api.post('/branches', newBranch)
+      setShowBranchForm(false)
+      setNewBranch({ name: '', address: '' })
+      fetchBranches()
+    } catch (err) { alert(err.response?.data?.error || 'Failed to create branch') }
+  }
+
+  const handleCreateTimetable = async (e) => {
+    e.preventDefault()
+    try {
+      await api.post('/timetable', { branchId: selectedBranch, ...newTimetable })
+      setShowCreateForm(false)
+      setNewTimetable({ name: '', effectiveFrom: '' })
+      fetchTimetable(selectedBranch)
+    } catch (err) { alert(err.response?.data?.error || 'Failed to create timetable') }
+  }
+
+  // ── EMPLOYEE GROUPING ──────────────────────────────────────────
   const groupedEmployees = useMemo(() => {
     const groups = {}
     employees.forEach(emp => {
@@ -152,13 +222,6 @@ const ScheduleManager = () => {
     if (searchName) list = list.filter(e => e.name.toLowerCase().includes(searchName.toLowerCase()))
     return list
   }, [employees, groupedEmployees, positionFilter, searchName])
-
-  // Get slots for a specific day+hour cell
-  const getCellSlots = (dayIndex, hour) => {
-    if (!grid[dayIndex]) return []
-    const hourData = grid[dayIndex]?.hours?.find(h => h.hour === hour)
-    return hourData?.slots || []
-  }
 
   return (
     <div className="container mx-auto p-4">
@@ -177,7 +240,20 @@ const ScheduleManager = () => {
         </div>
       </div>
 
-      {/* New Branch Form */}
+      {/* Legend */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        {Object.entries(POSITION_COLORS).filter(([k]) => k !== 'Other').map(([group, colors]) => (
+          <span key={group} className={`px-3 py-1 rounded-full text-xs font-medium ${colors.badge}`}>
+            ● {group}
+          </span>
+        ))}
+        <span className="px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">● Other</span>
+        <span className="ml-4 px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
+          ⟷ Drag cell to copy to another hour
+        </span>
+      </div>
+
+      {/* Branch Form */}
       {showBranchForm && (
         <div className="bg-white rounded-lg shadow p-6 mb-6 border-l-4 border-gray-600">
           <h3 className="text-lg font-semibold mb-4">Create New Branch</h3>
@@ -197,13 +273,13 @@ const ScheduleManager = () => {
             <div className="col-span-2 flex gap-2">
               <button type="submit" className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Create Branch</button>
               <button type="button" onClick={() => setShowBranchForm(false)}
-                className="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400">Cancel</button>
+                className="bg-gray-300 text-gray-700 px-4 py-2 rounded">Cancel</button>
             </div>
           </form>
         </div>
       )}
 
-      {/* New Timetable Form */}
+      {/* Timetable Form */}
       {showCreateForm && (
         <div className="bg-white rounded-lg shadow p-6 mb-6 border-l-4 border-blue-600">
           <h3 className="text-lg font-semibold mb-4">Create New Timetable</h3>
@@ -223,13 +299,13 @@ const ScheduleManager = () => {
             <div className="col-span-2 flex gap-2">
               <button type="submit" className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Create Timetable</button>
               <button type="button" onClick={() => setShowCreateForm(false)}
-                className="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400">Cancel</button>
+                className="bg-gray-300 text-gray-700 px-4 py-2 rounded">Cancel</button>
             </div>
           </form>
         </div>
       )}
 
-      {/* Branch Selector + Timetable Info */}
+      {/* Branch Selector */}
       <div className="bg-white rounded-lg shadow p-4 mb-6 flex flex-wrap items-center gap-4">
         <label className="font-medium text-gray-700">Branch:</label>
         <select value={selectedBranch} onChange={(e) => setSelectedBranch(parseInt(e.target.value))}
@@ -243,33 +319,37 @@ const ScheduleManager = () => {
             <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium">Active</span>
           </div>
         )}
+        {copying && (
+          <span className="ml-2 text-xs text-blue-600 animate-pulse font-medium">⟳ Copying slots...</span>
+        )}
       </div>
 
-      {/* Employee Assignment Panel */}
+      {/* Assignment Panel */}
       {selectedCell && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
           <div className="flex justify-between items-start mb-3">
             <h3 className="font-semibold text-blue-800">
               Assign Employee — {DAYS[selectedCell.dayIndex]}, {String(selectedCell.hour).padStart(2, '0')}:00–{String(selectedCell.hour + 1).padStart(2, '0')}:00
             </h3>
-            <button onClick={() => setSelectedCell(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+            <button onClick={() => setSelectedCell(null)} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
           </div>
 
           {/* Position Filter Tabs */}
           <div className="flex flex-wrap gap-2 mb-3">
-            {['All', ...Object.keys(groupedEmployees)].map(group => (
-              <button key={group}
-                onClick={() => { setPositionFilter(group); setSelectedEmployee('') }}
-                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors
-                  ${positionFilter === group
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-white border border-gray-300 text-gray-600 hover:border-blue-400'}`}>
-                {group} {group !== 'All' && `(${(groupedEmployees[group] || []).length})`}
-              </button>
-            ))}
+            {['All', ...Object.keys(groupedEmployees)].map(group => {
+              const colors = POSITION_COLORS[group]
+              return (
+                <button key={group} onClick={() => { setPositionFilter(group); setSelectedEmployee('') }}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors border
+                    ${positionFilter === group
+                      ? colors ? `${colors.bg} text-white border-transparent` : 'bg-gray-600 text-white border-transparent'
+                      : 'bg-white border-gray-300 text-gray-600 hover:border-blue-400'}`}>
+                  {group} {group !== 'All' && `(${(groupedEmployees[group] || []).length})`}
+                </button>
+              )
+            })}
           </div>
 
-          {/* Search + Employee List */}
           <div className="flex gap-4 flex-wrap items-start">
             <div className="flex-1 min-w-64">
               <input type="text" value={searchName}
@@ -279,24 +359,26 @@ const ScheduleManager = () => {
               <div className="border rounded bg-white max-h-40 overflow-y-auto">
                 {filteredEmployees.length === 0 ? (
                   <div className="p-3 text-sm text-gray-400 text-center">No employees found</div>
-                ) : (
-                  filteredEmployees.map(emp => (
-                    <div key={emp.id}
-                      onClick={() => handleEmployeeSelect(emp.id.toString())}
-                      className={`px-3 py-2 cursor-pointer flex justify-between items-center hover:bg-blue-50 border-b last:border-b-0
-                        ${selectedEmployee === emp.id.toString() ? 'bg-blue-100 border-blue-200' : ''}`}>
-                      <div>
-                        <div className="text-sm font-medium text-gray-800">{emp.name}</div>
-                        <div className="text-xs text-gray-500">{emp.position || emp.role}</div>
+                ) : filteredEmployees.map(emp => {
+                  const colors = POSITION_COLORS[getPositionGroup(emp)] || POSITION_COLORS['Other']
+                  return (
+                    <div key={emp.id} onClick={() => handleEmployeeSelect(emp.id.toString())}
+                      className={`px-3 py-2 cursor-pointer flex justify-between items-center hover:bg-gray-50 border-b last:border-b-0
+                        ${selectedEmployee === emp.id.toString() ? 'bg-blue-50' : ''}`}>
+                      <div className="flex items-center gap-2">
+                        <span className={`w-2 h-2 rounded-full ${colors.bg} flex-shrink-0`}></span>
+                        <div>
+                          <div className="text-sm font-medium text-gray-800">{emp.name}</div>
+                          <div className="text-xs text-gray-500">{emp.position || emp.role}</div>
+                        </div>
                       </div>
                       <div className="text-xs text-gray-400">{emp.department?.name}</div>
                     </div>
-                  ))
-                )}
+                  )
+                })}
               </div>
             </div>
 
-            {/* Station + Assign */}
             <div className="flex flex-col gap-3 min-w-48">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Station</label>
@@ -315,7 +397,7 @@ const ScheduleManager = () => {
         </div>
       )}
 
-      {/* Timetable Grid — Days as ROWS, Hours as COLUMNS */}
+      {/* Timetable Grid */}
       {loading ? (
         <div className="text-center py-12 text-gray-500">Loading timetable...</div>
       ) : !timetable ? (
@@ -328,15 +410,13 @@ const ScheduleManager = () => {
         </div>
       ) : (
         <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="p-3 bg-gray-50 border-b text-xs text-gray-500 flex justify-between">
-            <span>💡 Click any cell to assign an employee. Click ✕ on a tag to remove.</span>
-            <span>Showing 07:00 – 24:00</span>
+          <div className="p-3 bg-gray-50 border-b text-xs text-gray-500">
+            💡 Click any empty cell to assign · Drag a filled cell left/right to copy its staff to another hour · Hover slot to remove
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse" style={{ minWidth: `${HOURS.length * 90 + 100}px` }}>
+            <table className="w-full border-collapse" style={{ minWidth: `${HOURS.length * 88 + 100}px` }}>
               <thead>
                 <tr className="bg-gray-100">
-                  {/* Day column header */}
                   <th className="border border-gray-200 p-2 text-xs font-semibold text-gray-600 w-24 sticky left-0 bg-gray-100 z-10">
                     Day / Hour
                   </th>
@@ -349,41 +429,64 @@ const ScheduleManager = () => {
               </thead>
               <tbody>
                 {DAYS.map((day, dayIndex) => (
-                  <tr key={day} className="hover:bg-gray-50">
-                    {/* Day label — sticky left */}
+                  <tr key={day}>
                     <td className="border border-gray-200 p-2 text-xs font-semibold text-gray-700 text-center sticky left-0 bg-white z-10 whitespace-nowrap">
                       {day}
                     </td>
                     {HOURS.map(hour => {
                       const slots = getCellSlots(dayIndex, hour)
                       const isSelected = selectedCell?.dayIndex === dayIndex && selectedCell?.hour === hour
+                      const isDragSrc = dragSource?.dayIndex === dayIndex && dragSource?.hour === hour
+                      const isDragTgt = dragOver?.dayIndex === dayIndex && dragOver?.hour === hour
+                      const hasSlots = slots.length > 0
+
                       return (
                         <td key={hour}
                           onClick={() => handleCellClick(dayIndex, hour)}
-                          className={`border border-gray-200 p-1 align-top cursor-pointer transition-colors
-                            ${isSelected ? 'bg-blue-100 ring-2 ring-inset ring-blue-400' :
-                              slots.length > 0 ? 'bg-green-50 hover:bg-green-100' :
-                              'hover:bg-blue-50'}`}
-                          style={{ minWidth: '80px', minHeight: '52px' }}>
+                          draggable={hasSlots}
+                          onDragStart={(e) => handleDragStart(e, dayIndex, hour)}
+                          onDragOver={(e) => handleDragOver(e, dayIndex, hour)}
+                          onDragLeave={handleDragLeave}
+                          onDrop={(e) => handleDrop(e, dayIndex, hour)}
+                          onDragEnd={handleDragEnd}
+                          className={`border border-gray-200 p-1 align-top transition-all
+                            ${isSelected ? 'bg-blue-100 ring-2 ring-inset ring-blue-400' : ''}
+                            ${isDragSrc ? 'opacity-50 scale-95' : ''}
+                            ${isDragTgt ? 'bg-yellow-100 ring-2 ring-inset ring-yellow-400' : ''}
+                            ${!isSelected && !isDragTgt && hasSlots ? 'cursor-grab active:cursor-grabbing' : ''}
+                            ${!isSelected && !isDragTgt && !hasSlots ? 'hover:bg-blue-50 cursor-pointer' : ''}
+                          `}
+                          style={{ minWidth: '80px', minHeight: '56px' }}>
+
+                          {/* Drop target indicator */}
+                          {isDragTgt && (
+                            <div className="text-center text-yellow-600 text-xs font-medium py-1">
+                              ⟷ Copy here
+                            </div>
+                          )}
+
                           <div className="flex flex-col gap-0.5">
-                            {slots.map(slot => (
-                              <div key={slot.slotId}
-                                className="bg-blue-600 text-white rounded px-1 py-0.5 text-xs flex items-start justify-between gap-0.5 group">
-                                <div className="min-w-0">
-                                  <div className="font-medium truncate leading-tight">{slot.employee.name}</div>
-                                  {slot.station && (
-                                    <div className="text-blue-200 truncate leading-tight" style={{ fontSize: '10px' }}>
-                                      {slot.station}
-                                    </div>
-                                  )}
+                            {slots.map(slot => {
+                              const colors = getSlotColor(slot.employee)
+                              return (
+                                <div key={slot.slotId}
+                                  className={`${colors.bg} text-white rounded px-1 py-0.5 text-xs flex items-start justify-between gap-0.5 group`}>
+                                  <div className="min-w-0">
+                                    <div className="font-medium truncate leading-tight">{slot.employee.name}</div>
+                                    {slot.station && (
+                                      <div className="text-white/70 truncate leading-tight" style={{ fontSize: '10px' }}>
+                                        {slot.station}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <button
+                                    onClick={(e) => handleRemoveSlot(slot.slotId, e)}
+                                    className="text-white/50 hover:text-white flex-shrink-0 leading-none font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+                                    ✕
+                                  </button>
                                 </div>
-                                <button
-                                  onClick={(e) => handleRemoveSlot(slot.slotId, e)}
-                                  className="text-blue-300 hover:text-white flex-shrink-0 leading-none font-bold opacity-0 group-hover:opacity-100 transition-opacity">
-                                  ✕
-                                </button>
-                              </div>
-                            ))}
+                              )
+                            })}
                           </div>
                         </td>
                       )
