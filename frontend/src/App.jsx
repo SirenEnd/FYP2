@@ -6,6 +6,7 @@ import ScheduleManager from './components/SupervisorView/ScheduleManager'
 import MySchedule from './components/StaffView/MySchedule'
 import Attendance from './components/StaffView/Attendance'
 import AttendanceReport from './components/SupervisorView/AttendanceReport'
+import LeavePage from './pages/LeavePage'
 
 const Dashboard = () => {
   const { user } = useAuthStore()
@@ -40,52 +41,66 @@ const Dashboard = () => {
         {/* Navigation Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {user?.role === 'ADMIN' && (
-                        <a href="/employees" className="block">
-                <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
-                  <h3 className="text-lg font-semibold mb-2">👥 Employee Management</h3>
-                  <p className="text-gray-600 text-sm">Add, edit, or remove employees</p>
-                </div>
-              </a>
+            <a href="/employees" className="block">
+              <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
+                <h3 className="text-lg font-semibold mb-2">👥 Employee Management</h3>
+                <p className="text-gray-600 text-sm">Add, edit, or remove employees</p>
+              </div>
+            </a>
           )}
           
-                        {user?.role === 'ADMIN' && (
-                <a href="/payroll" className="block">
-                  <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
-                    <h3 className="text-lg font-semibold mb-2">💰 Payroll</h3>
-                    <p className="text-gray-600 text-sm">Process monthly payroll</p>
-                  </div>
-                </a>
-              )}
+          {user?.role === 'ADMIN' && (
+            <a href="/payroll" className="block">
+              <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
+                <h3 className="text-lg font-semibold mb-2">💰 Payroll</h3>
+                <p className="text-gray-600 text-sm">Process monthly payroll</p>
+              </div>
+            </a>
+          )}
           
-                      {(user?.role === 'ADMIN' || user?.role === 'SUPERVISOR') && (
-                <a href="/schedules" className="block">
-                  <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
-                    <h3 className="text-lg font-semibold mb-2">📅 Schedule Management</h3>
-                    <p className="text-gray-600 text-sm">Create and manage shifts</p>
-                  </div>
-                </a>
-              )}
+          {(user?.role === 'ADMIN' || user?.role === 'SUPERVISOR') && (
+            <a href="/schedules" className="block">
+              <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
+                <h3 className="text-lg font-semibold mb-2">📅 Schedule Management</h3>
+                <p className="text-gray-600 text-sm">Create and manage shifts</p>
+              </div>
+            </a>
+          )}
           
-                                <a href="/attendance" className="block">
-                <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
-                  <h3 className="text-lg font-semibold mb-2">⏰ Attendance</h3>
-                  <p className="text-gray-600 text-sm">Clock in/out and view history</p>
-                </div>
-              </a>
-                <a href="/my-schedule" className="block">
-        <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
-          <h3 className="text-lg font-semibold mb-2">📋 My Schedule</h3>
-          <p className="text-gray-600 text-sm">View your upcoming shifts</p>
-        </div>
-      </a>
-              {(user?.role === 'ADMIN' || user?.role === 'SUPERVISOR') && (
-          <a href="/attendance-report" className="block">
+          <a href="/attendance" className="block">
             <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
-              <h3 className="text-lg font-semibold mb-2">📊 Attendance Report</h3>
-              <p className="text-gray-600 text-sm">View all employee attendance</p>
+              <h3 className="text-lg font-semibold mb-2">⏰ Attendance</h3>
+              <p className="text-gray-600 text-sm">Clock in/out and view history</p>
             </div>
           </a>
-        )}
+
+          <a href="/my-schedule" className="block">
+            <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
+              <h3 className="text-lg font-semibold mb-2">📋 My Schedule</h3>
+              <p className="text-gray-600 text-sm">View your upcoming shifts</p>
+            </div>
+          </a>
+
+          {(user?.role === 'ADMIN' || user?.role === 'SUPERVISOR') && (
+            <a href="/attendance-report" className="block">
+              <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
+                <h3 className="text-lg font-semibold mb-2">📊 Attendance Report</h3>
+                <p className="text-gray-600 text-sm">View all employee attendance</p>
+              </div>
+            </a>
+          )}
+
+          {/* Leave — visible to all roles */}
+          <a href="/leave" className="block">
+            <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
+              <h3 className="text-lg font-semibold mb-2">🌴 Leave Management</h3>
+              <p className="text-gray-600 text-sm">
+                {user?.role === 'STAFF'
+                  ? 'Apply for leave and view your history'
+                  : 'Review and approve leave requests'}
+              </p>
+            </div>
+          </a>
         </div>
       </main>
     </div>
@@ -126,25 +141,27 @@ function App() {
           }
         />
         <Route path="/" element={<Navigate to="/dashboard" />} />
+
         {/* Schedule Routes */}
-          <Route
-            path="/schedules"
-            element={
-              <ProtectedRoute>
-                <ScheduleManager />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/my-schedule"
-            element={
-              <ProtectedRoute>
-                <MySchedule />
-              </ProtectedRoute>
-            }
-          />
-          {/* Attendance Routes */}
-          <Route
+        <Route
+          path="/schedules"
+          element={
+            <ProtectedRoute>
+              <ScheduleManager />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/my-schedule"
+          element={
+            <ProtectedRoute>
+              <MySchedule />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Attendance Routes */}
+        <Route
           path="/attendance"
           element={
             <ProtectedRoute>
@@ -157,6 +174,16 @@ function App() {
           element={
             <ProtectedRoute>
               <AttendanceReport />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Leave Route */}
+        <Route
+          path="/leave"
+          element={
+            <ProtectedRoute>
+              <LeavePage />
             </ProtectedRoute>
           }
         />
