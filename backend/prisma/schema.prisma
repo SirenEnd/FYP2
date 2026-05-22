@@ -11,11 +11,15 @@ datasource db {
 model Branch {
   id          Int         @id @default(autoincrement())
   name        String      @unique
+  latitude    Float
+  longitude   Float
+  radiusMeters Int       @default(200)   
   address     String?
   isActive    Boolean     @default(true)
   createdAt   DateTime    @default(now())
   employees   Employee[]
   timetables  Timetable[]
+  updatedAt   DateTime   @updatedAt
 }
 
 // ─── DEPARTMENT ───────────────────────────────
@@ -72,6 +76,9 @@ model Attendance {
   status     AttendanceStatus @default(PRESENT)
   date       DateTime         @default(now())
   createdAt  DateTime         @default(now())
+   latitude    Float?    
+  longitude   Float?
+  distanceMeters Float?  
 }
 
 enum AttendanceStatus {
