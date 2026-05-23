@@ -68,15 +68,23 @@ const createBranch = async (req, res) => {
 const updateBranch = async (req, res) => {
   try {
     const id = parseInt(req.params.id)
-    const { name, address, isActive } = req.body
+    const { name, address, latitude, longitude, isActive } = req.body
+
+    // Build update data explicitly
+    const data = {}
+    if (name) data.name = name
+    if (address) data.address = address
+    if (isActive !== undefined) data.isActive = isActive
+
+    // Handle coordinates explicitly — check for null/undefined separately
+    if (latitude !== null && latitude !== undefined) data.latitude = parseFloat(latitude)
+    if (longitude !== null && longitude !== undefined) data.longitude = parseFloat(longitude)
+
+    console.log('Updating branch:', id, 'with data:', data)
 
     const branch = await prisma.branch.update({
       where: { id },
-      data: {
-        ...(name && { name }),
-        ...(address && { address }),
-        ...(isActive !== undefined && { isActive })
-      }
+      data
     })
 
     res.json({ message: 'Branch updated', branch })
