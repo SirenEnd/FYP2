@@ -40,7 +40,7 @@ function fmtDate(d) {
   return new Date(d).toLocaleDateString("en-MY", { day: "numeric", month: "short", year: "numeric" });
 }
 
-export default function LeaveStaff() {
+export default function LeaveStaff({ isSupervisor = false }) {
   const [history, setHistory]     = useState([]);
   const [loading, setLoading]     = useState(true);
   const [showForm, setShowForm]   = useState(false);
@@ -102,9 +102,13 @@ export default function LeaveStaff() {
       {/* Header */}
       <div className="flex items-start justify-between mb-6 gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">My Leave</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Apply for leave and track your applications</p>
-        </div>
+  <h1 className="text-2xl font-bold text-gray-900">My Leave</h1>
+  <p className="text-sm text-gray-500 mt-0.5">
+    {isSupervisor
+      ? 'Apply for your own leave — approvals are below'
+      : 'Apply for leave and track your applications'}
+  </p>
+</div>
         <button
           onClick={() => { setShowForm(true); setFormErr(""); }}
           className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"

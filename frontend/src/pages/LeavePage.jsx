@@ -7,7 +7,16 @@ export default function LeavePage() {
   const role = user?.role;
 
   if (role === "STAFF") return <LeaveStaff />;
-  if (role === "SUPERVISOR") return <LeaveApprovals role="SUPERVISOR" />;
+
+  if (role === "SUPERVISOR") return (
+    <div className="space-y-6">
+      {/* Supervisor can apply for their own leave */}
+      <LeaveStaff isSupervisor />
+      {/* Supervisor can also approve/reject staff leave */}
+      <LeaveApprovals role="SUPERVISOR" />
+    </div>
+  );
+
   if (role === "ADMIN") return <LeaveApprovals role="ADMIN" />;
 
   return (

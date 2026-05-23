@@ -225,8 +225,10 @@ export default function LeaveApprovals({ role = "SUPERVISOR" }) {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Leave Approvals</h1>
         <p className="text-sm text-gray-500 mt-0.5">
-          {role === "ADMIN" ? "Manage all leave requests across the restaurant" : "Review and action your team's leave requests"}
-        </p>
+  {role === "ADMIN"
+    ? "Manage all leave requests across the restaurant including supervisors"
+    : "Review and action your team's leave requests — your own leave is reviewed by Admin"}
+</p>
       </div>
 
       {/* Stats */}
@@ -311,8 +313,13 @@ export default function LeaveApprovals({ role = "SUPERVISOR" }) {
                   <Avatar name={leave.employee?.name} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                      <span className="font-bold text-sm text-gray-900">{leave.employee?.name}</span>
+                     <span className="font-bold text-sm text-gray-900">{leave.employee?.name}</span>
                       <StatusBadge status={leave.status} />
+                      {leave.employee?.role === 'SUPERVISOR' && (
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
+                          Supervisor
+                        </span>
+                      )}
                       <span className="text-xs text-gray-400">{leave.employee?.department?.name || leave.employee?.role}</span>
                     </div>
                     <div className="flex items-center gap-2 text-xs text-gray-500 flex-wrap">

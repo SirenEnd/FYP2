@@ -61,19 +61,34 @@ const getMyLeave = async (req, res) => {
 const getAllLeave = async (req, res) => {
   try {
     const { status } = req.query
+    const requestingRole = req.user.role
+
+    // Supervisors only see STAFF leave
+    // Admins see everyone including SUPERVISOR leave
+    const roleFilter = requestingRole === 'SUPERVISOR'
+      ? { role: 'STAFF' }
+      : {}
+
     const leaves = await prisma.leaveRequest.findMany({
-      where: { ...(status && { status }) },
+      where: {
+        ...(status && { status }),
+        employee: roleFilter
+      },
       include: {
         employee: {
           select: {
-            id: true, employeeId: true, name: true,
+            id: true,
+            employeeId: true,
+            name: true,
             position: true,
+            role: true,
             department: { select: { name: true } }
           }
         }
       },
       orderBy: { createdAt: 'desc' }
     })
+
     res.json({ total: leaves.length, leaves })
   } catch (err) {
     console.error(err)
