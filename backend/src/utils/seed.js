@@ -34,7 +34,9 @@ async function main() {
     create: {
       name: 'Air Putih Main Branch',
       address: 'Jalan Air Putih, Kuantan',
-      isActive: true
+      isActive: true,
+      latitude: 3.832790246950293, 
+      longitude:  103.34158788617017
     }
   })
 
