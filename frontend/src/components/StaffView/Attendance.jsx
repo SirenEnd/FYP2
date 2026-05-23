@@ -84,18 +84,43 @@ const Attendance = () => {
   }
 
   const handleClockIn = async () => {
-  try {
-    const response = await api.post('/attendance/clockin')
-    // Set the new attendance state from response
-    setTodayAttendance(response.data.attendance)
-    await fetchStats()
-    await fetchTodaySessions()
-    alert('Clocked in successfully!')
-  } catch (error) {
-    alert(error.response?.data?.error || 'Failed to clock in')
-  }
-}
+  setLoading(true)
 
+  if (!navigator.geolocation) {
+    alert('Geolocation is not supported by your browser.')
+    setLoading(false)
+    return
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    async (position) => {
+      try {
+        const { latitude, longitude } = position.coords
+        const response = await api.post('/attendance/clockin', { latitude, longitude })
+        setTodayAttendance(response.data.attendance)
+        await fetchStats()
+        await fetchTodaySessions()
+        alert(`✅ ${response.data.message} — ${response.data.distanceMeters}m from branch`)
+      } catch (error) {
+        const errData = error.response?.data
+        if (errData?.distanceMeters) {
+          alert(`📍 Too far from branch.\nNearest: ${errData.nearestBranch} (${errData.distanceMeters}m away)\nMust be within ${errData.requiredMeters}m.`)
+        } else {
+          alert(errData?.error || 'Failed to clock in')
+        }
+      } finally {
+        setLoading(false)
+      }
+    },
+    (err) => {
+      setLoading(false)
+      if (err.code === 1) alert('📍 Location access denied. Please enable GPS to clock in.')
+      else if (err.code === 2) alert('📍 Location unavailable. Please try again.')
+      else alert('📍 Could not get your location. Please try again.')
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+  )
+}
 const handleClockOut = async () => {
   try {
     await api.post('/attendance/clockout')
