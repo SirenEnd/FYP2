@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import BackButton from '../BackButton'
 import api from '../../services/api'
 
 const EmployeeManager = () => {
@@ -62,7 +63,9 @@ const EmployeeManager = () => {
   if (loading) return <div className="text-center py-8">Loading...</div>
 
   return (
+    
     <div className="container mx-auto p-6">
+      <BackButton />
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">Employee Management</h2>
         <button

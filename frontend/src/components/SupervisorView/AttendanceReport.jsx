@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import api from '../../services/api'
+import BackButton from '../BackButton'
 
 const AttendanceReport = () => {
   const [attendances, setAttendances] = useState([])
@@ -63,6 +64,7 @@ const AttendanceReport = () => {
 
   return (
     <div className="container mx-auto p-6">
+       <BackButton />
       <h2 className="text-2xl font-bold mb-6">Attendance Report</h2>
 
       {/* Filters */}

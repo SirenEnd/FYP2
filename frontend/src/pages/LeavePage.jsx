@@ -1,6 +1,7 @@
 import useAuthStore from "../stores/authStore";
 import LeaveStaff from "../components/StaffView/LeaveStaff";
 import LeaveApprovals from "../components/SupervisorView/LeaveApprovals";
+import BackButton from "../components/BackButton";
 
 export default function LeavePage() {
   const { user } = useAuthStore();
@@ -9,11 +10,12 @@ export default function LeavePage() {
   if (role === "STAFF") return <LeaveStaff />;
 
   if (role === "SUPERVISOR") return (
-    <div className="space-y-6">
-      {/* Supervisor can apply for their own leave */}
-      <LeaveStaff isSupervisor />
-      {/* Supervisor can also approve/reject staff leave */}
-      <LeaveApprovals role="SUPERVISOR" />
+    <div>
+      <div className="px-6 pt-6">
+        <BackButton />
+      </div>
+      <LeaveStaff isSupervisor hideBackButton />
+      <LeaveApprovals role="SUPERVISOR" hideBackButton />
     </div>
   );
 

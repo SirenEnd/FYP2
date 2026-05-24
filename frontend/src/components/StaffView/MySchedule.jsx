@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import BackButton from '../BackButton'
 import api from '../../services/api'
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -39,6 +40,7 @@ const MySchedule = () => {
 
   return (
     <div className="container mx-auto p-6">
+      <BackButton />
       <h2 className="text-2xl font-bold mb-6">My Weekly Schedule</h2>
 
       {loading ? (

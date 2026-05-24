@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import api from '../../services/api'
+import BackButton from '../BackButton'
 import { Clock, LogIn, LogOut, Coffee, Calendar } from 'lucide-react'
 
 const Attendance = () => {
@@ -96,6 +97,8 @@ const Attendance = () => {
     async (position) => {
       try {
         const { latitude, longitude } = position.coords
+        console.log('My coordinates:', latitude, longitude)
+        console.log('Accuracy:', position.coords.accuracy, 'meters')
         const response = await api.post('/attendance/clockin', { latitude, longitude })
         setTodayAttendance(response.data.attendance)
         await fetchStats()

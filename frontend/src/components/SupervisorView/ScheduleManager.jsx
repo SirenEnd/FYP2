@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
+import BackButton from '../BackButton'
 import api from '../../services/api'
+
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 const HOURS = Array.from({ length: 17 }, (_, i) => i + 7)
@@ -225,6 +227,7 @@ const ScheduleManager = () => {
 
   return (
     <div className="container mx-auto p-4">
+      <BackButton />
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">Timetable Manager</h2>
