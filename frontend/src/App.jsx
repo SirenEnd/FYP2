@@ -7,6 +7,7 @@ import MySchedule from './components/StaffView/MySchedule'
 import Attendance from './components/StaffView/Attendance'
 import AttendanceReport from './components/SupervisorView/AttendanceReport'
 import LeavePage from './pages/LeavePage'
+import { PayrollAdmin, PayrollStaff } from './pages/PayrollPage'
 
 const Dashboard = () => {
   const { user } = useAuthStore()
@@ -118,6 +119,14 @@ const AdminRoute = ({ children }) => {
   if (user?.role !== 'ADMIN') return <Navigate to="/dashboard" />
   return children
 }
+// Add a PayrollRoute helper
+const PayrollRoute = () => {
+  const { user } = useAuthStore()
+  if (user?.role === 'STAFF') return <PayrollStaff />
+  return <PayrollAdmin role={user?.role} />
+}
+
+
 
 function App() {
   return (
@@ -187,6 +196,14 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route 
+          path="/payroll" 
+          element={
+            <ProtectedRoute>
+              <PayrollRoute />
+            </ProtectedRoute>
+          } 
+          />
       </Routes>
     </BrowserRouter>
   )

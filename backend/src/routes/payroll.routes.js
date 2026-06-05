@@ -6,13 +6,15 @@ const {
   getAllPayroll,
   getMyPayroll,
   getPayrollById,
-  markAsPaid
+  markAsPaid,
+  deletePayroll
 } = require('../controllers/payroll.controller')
 
 router.post('/generate', protect, authorize('ADMIN'), generatePayroll)
-router.get('/', protect, authorize('ADMIN', 'SUPERVISOR'), getAllPayroll)
-router.get('/my', protect, getMyPayroll)
-router.get('/:id', protect, getPayrollById)
-router.put('/:id/pay', protect, authorize('ADMIN'), markAsPaid)
+router.get('/',          protect, authorize('ADMIN', 'SUPERVISOR'), getAllPayroll)
+router.get('/my',        protect, getMyPayroll)
+router.get('/:id',       protect, getPayrollById)
+router.put('/:id/pay',   protect, authorize('ADMIN'), markAsPaid)
+router.delete('/:id',    protect, authorize('ADMIN'), deletePayroll)
 
 module.exports = router
