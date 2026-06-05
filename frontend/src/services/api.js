@@ -1,8 +1,7 @@
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: 'https://restrohrms-backend.onrender.com/api',  // Live backend
-  // baseURL: 'http://localhost:5000/api',  // Local development
+  baseURL: 'https://restrohr-backend-399453204605.asia-southeast1.run.app/api',
   headers: { 'Content-Type': 'application/json' }
 })
 
