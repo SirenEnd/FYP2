@@ -19,7 +19,14 @@ export default function LeavePage() {
     </div>
   );
 
-  if (role === "ADMIN") return <LeaveApprovals role="ADMIN" />;
+  if (role === "ADMIN") return (
+    <div>
+      <div className="px-6 pt-6">
+        <BackButton />
+      </div>
+      <LeaveApprovals role="ADMIN" />
+    </div>
+  );
 
   return (
     <div className="flex items-center justify-center h-64 text-gray-400 text-sm">

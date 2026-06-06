@@ -171,6 +171,7 @@ const handleBreakEnd = async () => {
 
   return (
     <div className="container mx-auto p-6">
+       <BackButton />
       <h2 className="text-2xl font-bold mb-6">Attendance Management</h2>
 
       {/* Today's Attendance Card */}
