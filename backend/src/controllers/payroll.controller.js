@@ -1,136 +1,132 @@
 const prisma = require('../utils/prisma')
 
-// ── CONSTANTS ─────────────────────────────────────────────────────
-const HOURLY_RATE = 10.00          // RM 10.00/hr
-const SHIFT_HOURS = 8              // 8 hrs per shift (incl. 1hr break)
-const BREAK_HOURS = 1              // 1hr break deducted
-const EFFECTIVE_HOURS = SHIFT_HOURS - BREAK_HOURS  // 7 billable hrs per shift
+const HOURLY_RATE = 13.00
+const BILLABLE_HOURS_PER_DAY = 6
+const WORKING_DAYS_PER_CYCLE = 24
+const CYCLE_DAYS = 28
 const OT_MULTIPLIER = 1.5
-const SERVICE_CHARGE_PER_MONTH = 220 // flat RM220 service charge
+const SUPERVISOR_FIXED = 2500.00
+const ADVANCE_MAX_PERCENT = 0.50
+const EPF_RATE = 0.11
+const SOCSO_RATE = 0.005
+const SOCSO_CAP = 4000
 
-// Malaysian statutory deductions
-const EPF_RATE = 0.11              // employee 11%
-const SOCSO_RATE = 0.005           // employee 0.5%
-const SOCSO_CAP = 4000             // SOCSO capped at RM4,000 salary
-
-// ── HELPERS ───────────────────────────────────────────────────────
 const fmt2 = (n) => parseFloat(n.toFixed(2))
 
-const calculatePayroll = (attendances, basicSalary) => {
-  // Sum all clocked hours this month
-  const totalClocked = attendances.reduce((sum, a) => sum + (a.totalHours || 0), 0)
+const calculatePayroll = (attendances, role, basicSalary, advanceAmount = 0) => {
+  const completedSessions = attendances.filter(a => a.clockOut !== null)
+  const attendedDays = new Set(
+    completedSessions.map(a => new Date(a.date).toDateString())
+  ).size
 
-  // Expected hours = number of days attended × 7 billable hrs
-  const attendedDays = attendances.filter(a => a.clockOut !== null).length
-  const expectedHours = attendedDays * EFFECTIVE_HOURS
-
-  // Overtime = any hours beyond 7/day
-  const normalHours  = Math.min(totalClocked, expectedHours)
+  const totalClocked = completedSessions.reduce((sum, a) => sum + (a.totalHours || 0), 0)
+  const expectedHours = attendedDays * BILLABLE_HOURS_PER_DAY
   const overtimeHours = fmt2(Math.max(0, totalClocked - expectedHours))
 
-  // Pay calculation
-  const normalPay   = fmt2(normalHours * HOURLY_RATE)
-  const overtimePay = fmt2(overtimeHours * HOURLY_RATE * OT_MULTIPLIER)
-  const grossSalary = fmt2(normalPay + overtimePay + SERVICE_CHARGE_PER_MONTH)
+  let basePay, overtimePay, grossSalary
 
-  // Statutory deductions (based on basicSalary / contract pay, not gross)
-  const socsoBase      = Math.min(basicSalary, SOCSO_CAP)
-  const epfDeduction   = fmt2(basicSalary * EPF_RATE)
+  if (role === 'SUPERVISOR') {
+    basePay = SUPERVISOR_FIXED
+    overtimePay = fmt2(overtimeHours * HOURLY_RATE * OT_MULTIPLIER)
+    grossSalary = fmt2(basePay + overtimePay)
+  } else {
+    basePay = fmt2(WORKING_DAYS_PER_CYCLE * BILLABLE_HOURS_PER_DAY * HOURLY_RATE)
+    overtimePay = fmt2(overtimeHours * HOURLY_RATE * OT_MULTIPLIER)
+    grossSalary = fmt2(basePay + overtimePay)
+  }
+
+  const socsoBase = Math.min(grossSalary, SOCSO_CAP)
+  const epfDeduction = fmt2(grossSalary * EPF_RATE)
   const socsoDeduction = fmt2(socsoBase * SOCSO_RATE)
-
-  const netSalary = fmt2(grossSalary - epfDeduction - socsoDeduction)
+  const netSalary = fmt2(grossSalary - epfDeduction - socsoDeduction - advanceAmount)
 
   return {
-    totalHoursWorked: fmt2(totalClocked),
-    normalHours: fmt2(normalHours),
-    overtimeHours,
-    normalPay,
-    overtimePay,
-    serviceCharge: SERVICE_CHARGE_PER_MONTH,
-    grossSalary,
-    epfDeduction,
-    socsoDeduction,
-    netSalary,
-    attendedDays,
+    basePay, overtimeHours, overtimePay, grossSalary,
+    epfDeduction, socsoDeduction, netSalary,
+    advanceDeduction: advanceAmount, attendedDays,
+    totalHoursWorked: fmt2(totalClocked)
   }
 }
 
-// ── POST /api/payroll/generate ─────────────────────────────────────
+// POST /api/payroll/generate
 const generatePayroll = async (req, res) => {
   try {
-    const { month, year } = req.body
+    const { cycleStart, cycleEnd } = req.body
+    if (!cycleStart || !cycleEnd)
+      return res.status(400).json({ error: 'cycleStart and cycleEnd are required' })
 
-    if (!month || !year) {
-      return res.status(400).json({ error: 'month and year are required' })
-    }
+    const start = new Date(cycleStart)
+    const end = new Date(cycleEnd)
+    end.setHours(23, 59, 59, 999)
 
-    const targetMonth = parseInt(month)
-    const targetYear  = parseInt(year)
+    // Exclude ADMINs
+    const employees = await prisma.employee.findMany({
+      where: { isActive: true, role: { not: 'ADMIN' } }
+    })
 
-    const employees = await prisma.employee.findMany({ where: { isActive: true } })
-
-    const results = []
-    const errors  = []
+    const results = [], errors = []
 
     for (const emp of employees) {
       const existing = await prisma.payroll.findFirst({
-        where: { employeeId: emp.id, month: targetMonth, year: targetYear }
+        where: { employeeId: emp.id, cycleStart: start }
       })
-
       if (existing) {
-        errors.push({ employee: emp.name, error: 'Payroll already generated for this period' })
+        errors.push({ employee: emp.name, error: 'Payroll already generated for this cycle' })
         continue
       }
 
-      const start = new Date(targetYear, targetMonth - 1, 1)
-      const end   = new Date(targetYear, targetMonth, 1)
-
       const attendances = await prisma.attendance.findMany({
-        where: {
-          employeeId: emp.id,
-          date: { gte: start, lt: end },
-          clockOut: { not: null }        // only completed sessions
-        }
+        where: { employeeId: emp.id, date: { gte: start, lte: end }, clockOut: { not: null } }
       })
 
-      const calc = calculatePayroll(attendances, emp.salary)
+      // Sum approved advances for this cycle
+      const advances = await prisma.salaryAdvance.findMany({
+        where: { employeeId: emp.id, status: 'APPROVED',
+          requestedAt: { gte: start, lte: end } }
+      })
+      const advanceTotal = advances.reduce((s, a) => s + a.amount, 0)
+
+      const calc = calculatePayroll(attendances, emp.role, emp.salary, advanceTotal)
 
       const payroll = await prisma.payroll.create({
-        data: {
-          employeeId:     emp.id,
-          month:          targetMonth,
-          year:           targetYear,
-          basicSalary:    emp.salary,
-          overtimeHours:  calc.overtimeHours,
-          overtimePay:    calc.overtimePay,
-          serviceCharge:  calc.serviceCharge,
-          epfDeduction:   calc.epfDeduction,
-          socsoDeduction: calc.socsoDeduction,
-          grossSalary:    calc.grossSalary,
-          netSalary:      calc.netSalary,
-          status:         'PROCESSED'
-        }
-      })
+          data: {
+            employeeId: emp.id,
+            cycleStart: start,
+            cycleEnd: end,
+            basicSalary: calc.basePay,
+            overtimeHours: calc.overtimeHours,
+            overtimePay: calc.overtimePay,
+            epfDeduction: calc.epfDeduction,
+            socsoDeduction: calc.socsoDeduction,
+            grossSalary: calc.grossSalary,
+            netSalary: calc.netSalary,
+            advanceDeduction: calc.advanceDeduction,
+            status: 'PROCESSED'
+          }
+        })
+
+      // Link advance records to this payroll
+      if (advances.length > 0) {
+        await prisma.salaryAdvance.updateMany({
+          where: { id: { in: advances.map(a => a.id) } },
+          data: { deductedPayrollId: payroll.id }
+        })
+      }
 
       results.push({
-        id: payroll.id,
-        employee: emp.name,
-        employeeId: emp.employeeId,
-        attendedDays:  calc.attendedDays,
-        totalHours:    calc.totalHoursWorked,
-        normalPay:     calc.normalPay,
-        overtimePay:   calc.overtimePay,
-        netSalary:     calc.netSalary,
-        status: 'PROCESSED'
+        id: payroll.id, employee: emp.name, employeeId: emp.employeeId,
+        role: emp.role, attendedDays: calc.attendedDays,
+        totalHours: calc.totalHoursWorked, basePay: calc.basePay,
+        overtimePay: calc.overtimePay, advanceDeduction: calc.advanceDeduction,
+        netSalary: calc.netSalary, status: 'PROCESSED'
       })
     }
 
     res.status(201).json({
-      message: `Payroll generated for ${targetMonth}/${targetYear}`,
-      processed: results.length,
-      skipped:   errors.length,
-      results,
-      errors
+      message: `Payroll generated for cycle ${cycleStart} → ${cycleEnd}`,
+      cycleStart, cycleEnd,
+      processed: results.length, skipped: errors.length,
+      results, errors
     })
   } catch (err) {
     console.error(err)
@@ -138,52 +134,32 @@ const generatePayroll = async (req, res) => {
   }
 }
 
-// ── GET /api/payroll ───────────────────────────────────────────────
+// GET /api/payroll
 const getAllPayroll = async (req, res) => {
   try {
-    const { month, year } = req.query
-
+    const { cycleStart } = req.query
     const payrolls = await prisma.payroll.findMany({
-      where: {
-        ...(month && { month: parseInt(month) }),
-        ...(year  && { year:  parseInt(year)  })
-      },
+      where: { ...(cycleStart && { cycleStart: new Date(cycleStart) }) },
       include: {
-        employee: {
-          select: {
-            employeeId: true,
-            name: true,
-            position: true,
-            department: { select: { name: true } }
-          }
-        }
+        employee: { select: { employeeId: true, name: true, position: true, role: true, department: { select: { name: true } } } }
       },
-      orderBy: [{ year: 'desc' }, { month: 'desc' }, { employee: { name: 'asc' } }]
+      orderBy: [{ cycleStart: 'desc' }, { employee: { name: 'asc' } }]
     })
-
-    const totalNet = payrolls.reduce((sum, p) => sum + p.netSalary, 0)
-
-    res.json({
-      total: payrolls.length,
-      totalNetSalary: fmt2(totalNet),
-      payrolls
-    })
+    const totalNet = payrolls.reduce((s, p) => s + p.netSalary, 0)
+    res.json({ total: payrolls.length, totalNetSalary: parseFloat(totalNet.toFixed(2)), payrolls })
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Internal server error' })
   }
 }
 
-// ── GET /api/payroll/my ────────────────────────────────────────────
+// GET /api/payroll/my
 const getMyPayroll = async (req, res) => {
   try {
-    const employeeId = req.user.id
-
     const payrolls = await prisma.payroll.findMany({
-      where: { employeeId },
-      orderBy: [{ year: 'desc' }, { month: 'desc' }]
+      where: { employeeId: req.user.id },
+      orderBy: { cycleStart: 'desc' }
     })
-
     res.json({ total: payrolls.length, payrolls })
   } catch (err) {
     console.error(err)
@@ -191,31 +167,17 @@ const getMyPayroll = async (req, res) => {
   }
 }
 
-// ── GET /api/payroll/:id ───────────────────────────────────────────
+// GET /api/payroll/:id
 const getPayrollById = async (req, res) => {
   try {
     const id = parseInt(req.params.id)
-
     const payroll = await prisma.payroll.findUnique({
       where: { id },
-      include: {
-        employee: {
-          select: {
-            employeeId: true,
-            name: true,
-            position: true,
-            department: { select: { name: true } }
-          }
-        }
-      }
+      include: { employee: { select: { employeeId: true, name: true, position: true, role: true, department: { select: { name: true } } } } }
     })
-
     if (!payroll) return res.status(404).json({ error: 'Payroll record not found' })
-
-    if (req.user.role === 'STAFF' && payroll.employeeId !== req.user.id) {
+    if (req.user.role === 'STAFF' && payroll.employeeId !== req.user.id)
       return res.status(403).json({ error: 'Access denied' })
-    }
-
     res.json(payroll)
   } catch (err) {
     console.error(err)
@@ -223,22 +185,14 @@ const getPayrollById = async (req, res) => {
   }
 }
 
-// ── PUT /api/payroll/:id/pay ───────────────────────────────────────
+// PUT /api/payroll/:id/pay
 const markAsPaid = async (req, res) => {
   try {
     const id = parseInt(req.params.id)
-
     const payroll = await prisma.payroll.findUnique({ where: { id } })
     if (!payroll) return res.status(404).json({ error: 'Payroll not found' })
-    if (payroll.status === 'PAID') {
-      return res.status(409).json({ error: 'Payroll already marked as paid' })
-    }
-
-    const updated = await prisma.payroll.update({
-      where: { id },
-      data: { status: 'PAID', paidAt: new Date() }
-    })
-
+    if (payroll.status === 'PAID') return res.status(409).json({ error: 'Already paid' })
+    const updated = await prisma.payroll.update({ where: { id }, data: { status: 'PAID', paidAt: new Date() } })
     res.json({ message: 'Payroll marked as paid', payroll: updated })
   } catch (err) {
     console.error(err)
@@ -246,19 +200,98 @@ const markAsPaid = async (req, res) => {
   }
 }
 
-// ── DELETE /api/payroll/:id ────────────────────────────────────────
+// DELETE /api/payroll/:id
 const deletePayroll = async (req, res) => {
   try {
     const id = parseInt(req.params.id)
-
     const payroll = await prisma.payroll.findUnique({ where: { id } })
     if (!payroll) return res.status(404).json({ error: 'Payroll not found' })
-    if (payroll.status === 'PAID') {
-      return res.status(409).json({ error: 'Cannot delete a paid payroll record' })
-    }
-
+    if (payroll.status === 'PAID') return res.status(409).json({ error: 'Cannot delete a paid record' })
     await prisma.payroll.delete({ where: { id } })
-    res.json({ message: 'Payroll record deleted' })
+    res.json({ message: 'Payroll deleted' })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+}
+
+// POST /api/payroll/advance — Staff requests advance
+const requestAdvance = async (req, res) => {
+  try {
+    const employeeId = req.user.id
+    const { amount, reason } = req.body
+    if (!amount) return res.status(400).json({ error: 'amount is required' })
+
+    const emp = await prisma.employee.findUnique({ where: { id: employeeId } })
+    const maxAdvance = emp.role === 'SUPERVISOR'
+      ? SUPERVISOR_FIXED * ADVANCE_MAX_PERCENT
+      : WORKING_DAYS_PER_CYCLE * BILLABLE_HOURS_PER_DAY * HOURLY_RATE * ADVANCE_MAX_PERCENT
+
+    if (parseFloat(amount) > maxAdvance)
+      return res.status(400).json({ error: `Advance cannot exceed RM${maxAdvance.toFixed(2)} (50% of base pay)`, maxAdvance })
+
+    const advance = await prisma.salaryAdvance.create({
+      data: { employeeId, amount: parseFloat(amount), reason, status: 'PENDING' }
+    })
+    res.status(201).json({ message: 'Advance request submitted', advance, maxAdvance })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+}
+
+// PUT /api/payroll/advance/:id/approve
+const approveAdvance = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id)
+    const advance = await prisma.salaryAdvance.update({
+      where: { id },
+      data: { status: 'APPROVED', reviewedBy: req.user.id, reviewedAt: new Date() }
+    })
+    res.json({ message: 'Advance approved', advance })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+}
+
+// PUT /api/payroll/advance/:id/reject
+const rejectAdvance = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id)
+    const advance = await prisma.salaryAdvance.update({
+      where: { id },
+      data: { status: 'REJECTED', reviewedBy: req.user.id, reviewedAt: new Date() }
+    })
+    res.json({ message: 'Advance rejected', advance })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+}
+
+// GET /api/payroll/advances
+const getAllAdvances = async (req, res) => {
+  try {
+    const advances = await prisma.salaryAdvance.findMany({
+      include: { employee: { select: { employeeId: true, name: true, role: true, position: true } } },
+      orderBy: { requestedAt: 'desc' }
+    })
+    res.json({ total: advances.length, advances })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+}
+
+// GET /api/payroll/advances/my
+const getMyAdvances = async (req, res) => {
+  try {
+    const advances = await prisma.salaryAdvance.findMany({
+      where: { employeeId: req.user.id },
+      orderBy: { requestedAt: 'desc' }
+    })
+    res.json({ total: advances.length, advances })
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Internal server error' })
@@ -266,10 +299,7 @@ const deletePayroll = async (req, res) => {
 }
 
 module.exports = {
-  generatePayroll,
-  getAllPayroll,
-  getMyPayroll,
-  getPayrollById,
-  markAsPaid,
-  deletePayroll
+  generatePayroll, getAllPayroll, getMyPayroll, getPayrollById,
+  markAsPaid, deletePayroll, requestAdvance, approveAdvance, rejectAdvance,
+  getAllAdvances, getMyAdvances
 }

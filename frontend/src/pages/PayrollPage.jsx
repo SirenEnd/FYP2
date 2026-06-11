@@ -42,7 +42,6 @@ function PayslipModal({ payroll, onClose }) {
   const rows = [
     { label: 'Basic Pay (hourly rate × hours)', value: payroll.grossSalary - payroll.overtimePay - payroll.serviceCharge, positive: true },
     { label: `Overtime Pay (×1.5 @ RM${HOURLY_RATE}/hr)`, value: payroll.overtimePay, positive: true },
-    { label: 'Service Charge', value: payroll.serviceCharge, positive: true },
     { label: 'Gross Salary', value: payroll.grossSalary, positive: true, bold: true },
     { label: 'EPF Deduction (Employee 11%)', value: -payroll.epfDeduction, positive: false },
     { label: 'SOCSO Deduction (Employee 0.5%)', value: -payroll.socsoDeduction, positive: false },
@@ -87,17 +86,18 @@ function PayslipModal({ payroll, onClose }) {
         {/* Body */}
         <div className="p-6">
           {/* Earnings summary */}
-          <div className="grid grid-cols-2 gap-3 mb-5">
-            {[
-              { label: 'Hours Worked', value: `${(payroll.overtimeHours + ((payroll.grossSalary - payroll.overtimePay - payroll.serviceCharge) / HOURLY_RATE)).toFixed(1)}h` },
-              { label: 'Overtime Hours', value: `${payroll.overtimeHours}h` },
-            ].map(item => (
-              <div key={item.label} className="bg-slate-50 rounded-xl px-4 py-3">
-                <p className="text-xs text-slate-400 font-medium mb-0.5">{item.label}</p>
-                <p className="text-lg font-bold text-slate-700">{item.value}</p>
+          
+              <div className="grid grid-cols-2 gap-3 mb-5">
+                {[
+                  { label: 'Total hours worked', value: `${((payroll.grossSalary - payroll.overtimePay) / 13).toFixed(1)}h` },
+                  { label: 'Overtime hours', value: `${payroll.overtimeHours}h` },
+                ].map(item => (
+                  <div key={item.label} className="bg-slate-50 rounded-xl px-4 py-3">
+                    <p className="text-xs text-slate-400 font-medium mb-0.5">{item.label}</p>
+                    <p className="text-lg font-bold text-slate-700">{item.value}</p>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
 
           {/* Line items */}
           <div className="border border-slate-100 rounded-xl overflow-hidden divide-y divide-slate-100">
@@ -252,10 +252,8 @@ export function PayrollAdmin({ role = 'ADMIN' }) {
       <div className="flex items-start justify-between mb-6 gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Payroll Management</h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            Hourly rate: <span className="font-semibold text-slate-700">RM {HOURLY_RATE}.00/hr</span>
-            &nbsp;· 8-hour shift · 1-hour break · 7 billable hours/shift
-          </p>
+          <p>Hourly rate: <span className="font-semibold text-slate-700">RM {HOURLY_RATE}.00/hr</span>
+           · 6 billable hrs/day · 24 days/cycle</p>
         </div>
         {isAdmin && (
           <button onClick={() => setShowGenForm(!showGenForm)}
