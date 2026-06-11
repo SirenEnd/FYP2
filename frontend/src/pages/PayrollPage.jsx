@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 
 // ── CONSTANTS ──────────────────────────────────────────────────────
-const HOURLY_RATE = 10
+const HOURLY_RATE = 13
 const MONTHS = [
   'January','February','March','April','May','June',
   'July','August','September','October','November','December'
@@ -40,7 +40,7 @@ function PayslipModal({ payroll, onClose }) {
   const emp = payroll.employee || {}
 
   const rows = [
-    { label: 'Basic Pay (hourly rate × hours)', value: payroll.grossSalary - payroll.overtimePay - payroll.serviceCharge, positive: true },
+    { label: 'Basic Pay (hourly rate × hours)', value: payroll.grossSalary - payroll.overtimePay, positive: true },
     { label: `Overtime Pay (×1.5 @ RM${HOURLY_RATE}/hr)`, value: payroll.overtimePay, positive: true },
     { label: 'Gross Salary', value: payroll.grossSalary, positive: true, bold: true },
     { label: 'EPF Deduction (Employee 11%)', value: -payroll.epfDeduction, positive: false },

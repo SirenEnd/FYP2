@@ -9,13 +9,13 @@ datasource db {
 
 // ─── BRANCH ───────────────────────────────────
 model Branch {
-  id          Int         @id @default(autoincrement())
-  name        String      @unique
+  id          Int          @id @default(autoincrement())
+  name        String       @unique
   address     String?
   latitude    Float?
   longitude   Float?
-  isActive    Boolean     @default(true)
-  createdAt   DateTime    @default(now())
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
   employees   Employee[]
   timetables  Timetable[]
   attendances Attendance[]
@@ -49,11 +49,13 @@ model Employee {
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
-  attendances   Attendance[]
-  leaveRequests LeaveRequest[]
-  payrolls      Payroll[]
-  performances  Performance[]
+  attendances    Attendance[]
+  leaveRequests  LeaveRequest[]
+  payrolls       Payroll[]
+  performances   Performance[]
   timetableSlots TimetableSlot[]
+
+  salaryAdvances SalaryAdvance[]
 }
 
 enum Role {
@@ -110,9 +112,9 @@ model TimetableSlot {
   timetable   Timetable @relation(fields: [timetableId], references: [id])
   employeeId  Int
   employee    Employee  @relation(fields: [employeeId], references: [id])
-  dayOfWeek   Int       // 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun
-  startHour   Int       // 7 = 07:00, 23 = 23:00
-  endHour     Int       // startHour + 1
+  dayOfWeek   Int // 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun
+  startHour   Int // 7 = 07:00, 23 = 23:00
+  endHour     Int // startHour + 1
   station     String?
   createdAt   DateTime  @default(now())
 
@@ -121,19 +123,19 @@ model TimetableSlot {
 
 // ─── LEAVE REQUEST ────────────────────────────
 model LeaveRequest {
-  id           Int         @id @default(autoincrement())
-  employeeId   Int
-  employee     Employee    @relation(fields: [employeeId], references: [id])
-  leaveType    LeaveType
-  startDate    DateTime
-  endDate      DateTime
-  totalDays    Int
-  reason       String?
-  status       LeaveStatus @default(PENDING)
-  reviewedBy   Int?
-  reviewedAt   DateTime?
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  id         Int         @id @default(autoincrement())
+  employeeId Int
+  employee   Employee    @relation(fields: [employeeId], references: [id])
+  leaveType  LeaveType
+  startDate  DateTime
+  endDate    DateTime
+  totalDays  Int
+  reason     String?
+  status     LeaveStatus @default(PENDING)
+  reviewedBy Int?
+  reviewedAt DateTime?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
 }
 
 enum LeaveType {
@@ -156,22 +158,22 @@ enum PayrollStatus {
 }
 
 model Payroll {
-  id               Int           @id @default(autoincrement())
+  id               Int             @id @default(autoincrement())
   employeeId       Int
-  employee         Employee      @relation(fields: [employeeId], references: [id])
+  employee         Employee        @relation(fields: [employeeId], references: [id])
   cycleStart       DateTime
   cycleEnd         DateTime
   basicSalary      Float
-  overtimeHours    Float         @default(0)
-  overtimePay      Float         @default(0)
-  epfDeduction     Float         @default(0)
-  socsoDeduction   Float         @default(0)
+  overtimeHours    Float           @default(0)
+  overtimePay      Float           @default(0)
+  epfDeduction     Float           @default(0)
+  socsoDeduction   Float           @default(0)
   grossSalary      Float
   netSalary        Float
-  advanceDeduction Float         @default(0)
-  status           PayrollStatus @default(PENDING)
+  advanceDeduction Float           @default(0)
+  status           PayrollStatus   @default(PENDING)
   paidAt           DateTime?
-  createdAt        DateTime      @default(now())
+  createdAt        DateTime        @default(now())
   advances         SalaryAdvance[]
 }
 
