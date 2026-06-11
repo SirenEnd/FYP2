@@ -149,6 +149,12 @@ enum LeaveStatus {
   REJECTED
 }
 
+enum PayrollStatus {
+  PENDING
+  PAID
+  CANCELLED
+}
+
 model Payroll {
   id               Int           @id @default(autoincrement())
   employeeId       Int
