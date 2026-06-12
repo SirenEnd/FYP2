@@ -17,7 +17,7 @@ steps:
       - '--image'
       - 'gcr.io/$PROJECT_ID/restrohr-backend'
       - '--region'
-      - 'us-central1'
+      - 'asia-southeast1'
       - '--platform'
       - 'managed'
       - '--allow-unauthenticated'
