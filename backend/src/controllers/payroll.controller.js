@@ -224,20 +224,16 @@ const getAllPayroll = async (req, res) => {
       orderBy: { employee: { name: 'asc' } },
     })
 
-    const enriched = payrollsRaw.map((p) => ({
+    // Attach month/year for frontend convenience
+    const enriched = payrolls.map((p) => ({
       ...p,
       month: m,
-      year: y,
-      attendedDays: null,
-      totalHoursWorked: null
+      year:  y,
+      attendedDays: null,        // optional fallback
+      totalHoursWorked: null     // optional fallback
     }))
 
-    res.json({
-      month: m,
-      year: y,
-      total: enriched.length,
-      payrolls: enriched
-    })
+    res.json({ month: m, year: y, total: enriched.length, payrolls: enriched })
   } catch (err) {
     console.error('getAllPayroll error:', err)
     res.status(500).json({ error: 'Internal server error' })
