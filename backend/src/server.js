@@ -5,7 +5,7 @@ const PORT = process.env.PORT || 5000;
 
 // In your server.js or a separate scheduler file
 const cron = require('node-cron')
-const { autoGeneratePayroll } = require('./controllers/payroll.controller')
+const { autoGeneratePayroll } = require('./controllers/payrollController')
 
 // Run every day at 2 AM
 cron.schedule('0 2 * * *', async () => {
