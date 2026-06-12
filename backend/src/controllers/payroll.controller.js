@@ -37,8 +37,12 @@ async function countAttendedDays(employeeId, cycleStart, cycleEnd) {
 
   // Deduplicate by calendar date (an employee could clock in twice in one day)
   const uniqueDates = new Set(
-    records.map((r) => new Date(r.date).toISOString().slice(0, 10))
-  )
+  records.map((r) => {
+    const d = new Date(r.date).toISOString().split('T')[0]
+    d.setHours(0, 0, 0, 0)
+    return d.toISOString().split('T')[0]
+  })
+)
   return uniqueDates.size
 }
 
@@ -55,9 +59,12 @@ async function calculatePayroll(employeeId, role, cycleStart, cycleEnd, advanceA
   })
 
   const attendedDays    = await countAttendedDays(employeeId, cycleStart, cycleEnd)
-  const totalClocked    = attendances.reduce((s, a) => s + (a.totalHours || 0), 0)
+ const totalClocked = attendances.reduce((sum, a) => {
+  if (!a.clockIn || !a.clockOut) return sum
+  return sum + (new Date(a.clockOut) - new Date(a.clockIn)) / 3600000
+}, 0)
   const expectedHours   = attendedDays * BILLABLE_HRS_DAY
-  const overtimeHours   = fmt2(Math.max(0, totalClocked - expectedHours))
+  const overtimeHours = fmt2(Math.max(0, totalClocked - expectedHours))
   const overtimePay     = fmt2(overtimeHours * HOURLY_RATE * OT_MULTIPLIER)
 
   let basePay, grossSalary
@@ -152,6 +159,8 @@ const generatePayroll = async (req, res) => {
           grossSalary:     calc.grossSalary,
           netSalary:       calc.netSalary,
           advanceDeduction: calc.advanceDeduction,
+          attendedDays: calc.attendedDays,
+          totalHoursWorked: calc.totalHoursWorked,
           status:          'PENDING',
         },
       })
@@ -201,7 +210,7 @@ const getAllPayroll = async (req, res) => {
     const y = parseInt(req.query.year)  || new Date().getFullYear()
     const { cycleStart, cycleEnd } = monthBounds(m, y)
 
-    const payrolls = await prisma.payroll.findMany({
+    const payrollsRaw = await prisma.payroll.findMany({
       where: { cycleStart, cycleEnd },
       include: {
         employee: {
@@ -220,6 +229,8 @@ const getAllPayroll = async (req, res) => {
       ...p,
       month: m,
       year:  y,
+      attendedDays: null,        // optional fallback
+      totalHoursWorked: null     // optional fallback
     }))
 
     res.json({ month: m, year: y, total: enriched.length, payrolls: enriched })
