@@ -3,22 +3,67 @@ const { PrismaClient } = require('@prisma/client')
 
 const prisma = new PrismaClient()
 
+// ─── HELPERS ───────────────────────────────
+const randomFrom = (arr) => arr[Math.floor(Math.random() * arr.length)]
+
+// Malaysian-style names
+const maleNames = [
+  "Ahmad", "Muhammad", "Zulqarnain", "Aiman", "Hakim",
+  "Firdaus", "Amir", "Syafiq", "Hafiz", "Imran"
+]
+
+const femaleNames = [
+  "Nurul", "Siti", "Aisyah", "Hannah", "Farah",
+  "Nadia", "Syaza", "Izzati", "Aina", "Balqis"
+]
+
+const lastNames = [
+  "Hassan", "Ismail", "Rahman", "Abdullah", "Kamal",
+  "Razak", "Halim", "Omar", "Yusof", "Ali"
+]
+
+// ─── MAIN SEED ─────────────────────────────
 async function main() {
   const password = await bcrypt.hash('password123', 10)
 
-  // ─────────────────────────────
-  // DEPARTMENTS
-  // ─────────────────────────────
+  // ─── BRANCHES ───────────────────────────
+  const branches = await Promise.all([
+    prisma.branch.upsert({
+      where: { name: 'DevBranch' },
+      update: {},
+      create: {
+        name: 'DevBranch',
+        latitude: 2.949120,
+        longitude: 101.669274
+      }
+    }),
+    prisma.branch.upsert({
+      where: { name: 'AirPutih' },
+      update: {},
+      create: {
+        name: 'AirPutih',
+        latitude: 3.832792,
+        longitude: 103.341615
+      }
+    }),
+    prisma.branch.upsert({
+      where: { name: 'InderaMahkota' },
+      update: {},
+      create: {
+        name: 'InderaMahkota',
+        latitude: 3.835269,
+        longitude: 103.301377
+      }
+    })
+  ])
+
+  const [dev, airPutih, indera] = branches
+
+  // ─── DEPARTMENTS ─────────────────────────
   const kitchen = await prisma.department.upsert({
     where: { name: 'Kitchen' },
     update: {},
     create: { name: 'Kitchen' }
-  })
-
-  const management = await prisma.department.upsert({
-    where: { name: 'Management' },
-    update: {},
-    create: { name: 'Management' }
   })
 
   const service = await prisma.department.upsert({
@@ -27,51 +72,13 @@ async function main() {
     create: { name: 'Service' }
   })
 
-  // ─────────────────────────────
-  // BRANCHES (adjusted ~100m safe radius centers)
-  // ─────────────────────────────
-  const branches = [
-    {
-      name: 'DevBranch',
-      address: 'Dev Branch HQ',
-      latitude: 2.949200,
-      longitude: 101.669300
-    },
-    {
-      name: 'AirPutih',
-      address: 'Air Putih Branch',
-      latitude: 3.832800,
-      longitude: 103.341620
-    },
-    {
-      name: 'InderaMahkota',
-      address: 'Indera Mahkota Branch',
-      latitude: 3.835300,
-      longitude: 103.301380
-    }
-  ]
+  const management = await prisma.department.upsert({
+    where: { name: 'Management' },
+    update: {},
+    create: { name: 'Management' }
+  })
 
-  const createdBranches = {}
-
-  for (const b of branches) {
-    createdBranches[b.name] = await prisma.branch.upsert({
-      where: { name: b.name },
-      update: {},
-      create: {
-        name: b.name,
-        address: b.address,
-        latitude: b.latitude,
-        longitude: b.longitude,
-        isActive: true
-      }
-    })
-  }
-
-  // ─────────────────────────────
-  // USERS
-  // ─────────────────────────────
-
-  // Admin
+  // ─── ADMIN ───────────────────────────────
   await prisma.employee.upsert({
     where: { email: 'admin@restrohr.com' },
     update: {},
@@ -83,93 +90,81 @@ async function main() {
       role: 'ADMIN',
       position: 'System Administrator',
       salary: 5000,
-      departmentId: management.id
+      departmentId: management.id,
+      branchId: dev.id
     }
   })
 
-  // Supervisor 1
-  await prisma.employee.upsert({
-    where: { email: 'supervisor@restrohr.com' },
-    update: {},
-    create: {
+  // ─── SUPERVISORS ─────────────────────────
+  const supervisors = [
+    {
       employeeId: 'RST-007',
       name: 'Nurul Hidayah',
-      email: 'supervisor@restrohr.com',
-      password,
-      role: 'SUPERVISOR',
-      position: 'Kitchen Supervisor',
-      salary: 3200,
-      departmentId: kitchen.id,
-      branchId: createdBranches.DevBranch.id
-    }
-  })
-
-  // Supervisor 2 (NEW)
-  await prisma.employee.upsert({
-    where: { email: 'supervisor2@restrohr.com' },
-    update: {},
-    create: {
+      email: 'supervisor1@restrohr.com',
+      position: 'Kitchen Supervisor'
+    },
+    {
       employeeId: 'RST-008',
-      name: 'Aiman Rahman',
+      name: 'Muhammad Hakim Razak',
       email: 'supervisor2@restrohr.com',
-      password,
-      role: 'SUPERVISOR',
-      position: 'Branch Supervisor',
-      salary: 3200,
-      departmentId: management.id,
-      branchId: createdBranches.AirPutih.id
+      position: 'Operations Supervisor'
     }
-  })
+  ]
 
-  // ─────────────────────────────
-  // STAFF GENERATION
-  // ─────────────────────────────
-
-  let staffCount = 1
-
-  // 10 Kitchen Staff
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < supervisors.length; i++) {
     await prisma.employee.upsert({
-      where: { email: `kitchen${i}@restrohr.com` },
+      where: { email: supervisors[i].email },
       update: {},
       create: {
-        employeeId: `KCH-${String(staffCount).padStart(3, '0')}`,
-        name: `Kitchen Staff ${i + 1}`,
-        email: `kitchen${i}@restrohr.com`,
+        ...supervisors[i],
         password,
-        role: 'STAFF',
-        position: 'Kitchen Crew',
-        salary: 1800,
-        departmentId: kitchen.id,
-        branchId: i % 2 === 0 ? createdBranches.DevBranch.id : createdBranches.AirPutih.id
+        role: 'SUPERVISOR',
+        salary: 3200,
+        departmentId: management.id,
+        branchId: branches[i % branches.length].id
       }
     })
-    staffCount++
   }
 
-  // 10 Service Staff
-  for (let i = 0; i < 10; i++) {
-    await prisma.employee.upsert({
-      where: { email: `service${i}@restrohr.com` },
-      update: {},
-      create: {
-        employeeId: `SRV-${String(staffCount).padStart(3, '0')}`,
-        name: `Service Staff ${i + 1}`,
-        email: `service${i}@restrohr.com`,
+  // ─── STAFF (20 TOTAL) ─────────────────────
+  const staffList = []
+
+  for (let i = 1; i <= 10; i++) {
+    staffList.push({
+      type: 'Kitchen',
+      departmentId: kitchen.id
+    })
+  }
+
+  for (let i = 1; i <= 10; i++) {
+    staffList.push({
+      type: 'Service',
+      departmentId: service.id
+    })
+  }
+
+  for (let i = 0; i < staffList.length; i++) {
+    const first = randomFrom(maleNames.concat(femaleNames))
+    const last = randomFrom(lastNames)
+
+    await prisma.employee.create({
+      data: {
+        employeeId: `RST-${100 + i}`,
+        name: `${first} ${last}`,
+        email: `staff${i + 1}@restrohr.com`,
         password,
         role: 'STAFF',
-        position: 'Service Crew',
+        position: `${staffList[i].type} Crew`,
         salary: 1800,
-        departmentId: service.id,
-        branchId: i % 2 === 0 ? createdBranches.AirPutih.id : createdBranches.InderaMahkota.id
+        departmentId: staffList[i].departmentId,
+        branchId: branches[i % branches.length].id
       }
     })
-    staffCount++
   }
 
   console.log('Seed complete!')
-  console.log('Branches created: DevBranch, AirPutih, InderaMahkota')
-  console.log('Users created: 1 Admin, 2 Supervisors, 20 Staff')
+  console.log('Branches + Supervisors + 20 Staff created')
+  console.log('Password for all accounts: password123')
 }
 
 main()
