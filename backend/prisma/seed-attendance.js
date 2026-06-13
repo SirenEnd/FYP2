@@ -2,10 +2,20 @@ const { PrismaClient } = require('@prisma/client')
 const prisma = new PrismaClient()
 
 function randomBetween(min, max) {
-  return Math.floor(Math.random() * (max - min + 1)) + min
+  return Math.random() * (max - min) + min
 }
 
-function isWorkDay(probability = 0.75) {
+// generate small GPS offset (~100m radius)
+function generateNearbyLocation(lat, lng) {
+  const radius = 0.0010 // ~100m
+
+  const newLat = lat + (Math.random() - 0.5) * radius
+  const newLng = lng + (Math.random() - 0.5) * radius
+
+  return { lat: newLat, lng: newLng }
+}
+
+function isWorkDay(probability = 0.8) {
   return Math.random() < probability
 }
 
@@ -22,7 +32,9 @@ function getDates(start, end) {
 }
 
 async function seed() {
-  const employees = await prisma.employee.findMany()
+  const employees = await prisma.employee.findMany({
+    include: { branch: true }
+  })
 
   const start = new Date('2026-01-01')
   const end = new Date('2026-04-30')
@@ -31,47 +43,50 @@ async function seed() {
   const records = []
 
   for (const emp of employees) {
+    if (!emp.branch) continue
+
     const isSupervisor = emp.role === 'SUPERVISOR'
 
     for (const date of dates) {
 
-      // skip random off days
-      const workChance = isSupervisor ? 0.85 : 0.75
+      const workChance = isSupervisor ? 0.9 : 0.8
       if (!isWorkDay(workChance)) continue
 
-      const baseStartHour = randomBetween(8, 11)
-
-      const workHours = isSupervisor
-        ? randomBetween(6, 9)
-        : randomBetween(5, 8)
-
-      const overtimeHours = Math.random() < 0.2
-        ? randomBetween(1, 3)
-        : 0
+      const baseHour = randomBetween(8, 11)
+      const workHours = isSupervisor ? randomBetween(6, 9) : randomBetween(5, 8)
 
       const clockIn = new Date(date)
-      clockIn.setHours(baseStartHour, randomBetween(0, 30), 0)
+      clockIn.setHours(baseHour, Math.floor(randomBetween(0, 30)), 0)
 
-      const clockOut = new Date(date)
-      clockOut.setHours(baseStartHour + workHours, randomBetween(0, 30), 0)
+      const clockOut = new Date(clockIn)
+      clockOut.setHours(clockIn.getHours() + workHours)
+
+      // GPS near branch (100m rule simulation)
+      const location = generateNearbyLocation(
+        emp.branch.latitude || 0,
+        emp.branch.longitude || 0
+      )
 
       records.push({
         employeeId: emp.id,
+        branchId: emp.branchId,
         clockIn,
         clockOut,
-        totalHours: workHours + overtimeHours,
+        totalHours: workHours,
         status: 'PRESENT',
         date: new Date(date),
+        latitude: location.lat,
+        longitude: location.lng
       })
     }
   }
 
   await prisma.attendance.createMany({
     data: records,
-    skipDuplicates: true,
+    skipDuplicates: true
   })
 
-  console.log(`Inserted ${records.length} realistic attendance records`)
+  console.log(`✅ Inserted ${records.length} attendance records`)
 }
 
 seed()

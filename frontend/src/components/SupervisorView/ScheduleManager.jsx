@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import BackButton from '../BackButton'
 import api from '../../services/api'
 
-
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 const HOURS = Array.from({ length: 17 }, (_, i) => i + 7)
 
@@ -36,6 +35,54 @@ const getSlotColor = (employee) => {
   return POSITION_COLORS[group] || POSITION_COLORS['Other']
 }
 
+// Helper function to get formatted date for timetable name
+const getDefaultTimetableName = () => {
+  const now = new Date()
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
+                      'July', 'August', 'September', 'October', 'November', 'December']
+  
+  // Function to add ordinal suffix to day (1st, 2nd, 3rd, etc.)
+  const getOrdinalDay = (day) => {
+    if (day > 3 && day < 21) return `${day}th`
+    switch (day % 10) {
+      case 1: return `${day}st`
+      case 2: return `${day}nd`
+      case 3: return `${day}rd`
+      default: return `${day}th`
+    }
+  }
+  
+  const month = monthNames[now.getMonth()]
+  const day = now.getDate()
+  const year = now.getFullYear()
+  const ordinalDay = getOrdinalDay(day)
+  
+  // Return format like "April 15th 2026" or "May 1st 2026"
+  return `${month} ${ordinalDay} ${year}`
+}
+
+// Helper function to get date for effective from (default to next Monday)
+const getDefaultEffectiveDate = () => {
+  const now = new Date()
+  const dayOfWeek = now.getDay() // 0 = Sunday, 1 = Monday, etc.
+  
+  // Calculate days until next Monday (if today is Monday, use today; otherwise, next Monday)
+  let daysUntilMonday
+  if (dayOfWeek === 1) {
+    daysUntilMonday = 0 // Today is Monday
+  } else if (dayOfWeek === 0) {
+    daysUntilMonday = 1 // Tomorrow is Monday
+  } else {
+    daysUntilMonday = 8 - dayOfWeek // Days until next Monday
+  }
+  
+  const nextMonday = new Date(now)
+  nextMonday.setDate(now.getDate() + daysUntilMonday)
+  
+  // Format as YYYY-MM-DD for date input
+  return nextMonday.toISOString().split('T')[0]
+}
+
 const ScheduleManager = () => {
   const [branches, setBranches] = useState([])
   const [selectedBranch, setSelectedBranch] = useState('')
@@ -50,7 +97,10 @@ const ScheduleManager = () => {
   const [selectedStation, setSelectedStation] = useState('')
   const [positionFilter, setPositionFilter] = useState('All')
   const [searchName, setSearchName] = useState('')
-  const [newTimetable, setNewTimetable] = useState({ name: '', effectiveFrom: '' })
+  const [newTimetable, setNewTimetable] = useState({ 
+    name: getDefaultTimetableName(), 
+    effectiveFrom: getDefaultEffectiveDate() 
+  })
   const [newBranch, setNewBranch] = useState({ name: '', address: '' })
   const [dragSource, setDragSource] = useState(null)   // {dayIndex, hour}
   const [dragOver, setDragOver] = useState(null)       // {dayIndex, hour}
@@ -58,6 +108,15 @@ const ScheduleManager = () => {
 
   useEffect(() => { fetchBranches(); fetchEmployees() }, [])
   useEffect(() => { if (selectedBranch) fetchTimetable(selectedBranch) }, [selectedBranch])
+
+  // Update timetable name and date when form opens
+  const handleOpenCreateForm = () => {
+    setNewTimetable({
+      name: getDefaultTimetableName(),
+      effectiveFrom: getDefaultEffectiveDate()
+    })
+    setShowCreateForm(true)
+  }
 
   const fetchBranches = async () => {
     try {
@@ -203,7 +262,10 @@ const ScheduleManager = () => {
     try {
       await api.post('/timetable', { branchId: selectedBranch, ...newTimetable })
       setShowCreateForm(false)
-      setNewTimetable({ name: '', effectiveFrom: '' })
+      setNewTimetable({ 
+        name: getDefaultTimetableName(), 
+        effectiveFrom: getDefaultEffectiveDate() 
+      })
       fetchTimetable(selectedBranch)
     } catch (err) { alert(err.response?.data?.error || 'Failed to create timetable') }
   }
@@ -236,7 +298,7 @@ const ScheduleManager = () => {
             className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 text-sm">
             + New Branch
           </button>
-          <button onClick={() => setShowCreateForm(!showCreateForm)} disabled={!selectedBranch}
+          <button onClick={handleOpenCreateForm} disabled={!selectedBranch}
             className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm disabled:opacity-50">
             + New Timetable
           </button>
@@ -291,13 +353,17 @@ const ScheduleManager = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1">Timetable Name</label>
               <input type="text" value={newTimetable.name}
                 onChange={(e) => setNewTimetable({ ...newTimetable, name: e.target.value })}
-                className="border rounded p-2 w-full" placeholder="e.g. May 2026 Schedule" required />
+                className="border rounded p-2 w-full" 
+                placeholder="e.g. May 2026 Schedule" 
+                required />
+              <p className="text-xs text-gray-400 mt-1">Auto-suggested: {getDefaultTimetableName()}</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Effective From</label>
               <input type="date" value={newTimetable.effectiveFrom}
                 onChange={(e) => setNewTimetable({ ...newTimetable, effectiveFrom: e.target.value })}
                 className="border rounded p-2 w-full" required />
+              <p className="text-xs text-gray-400 mt-1">Suggested: Next Monday</p>
             </div>
             <div className="col-span-2 flex gap-2">
               <button type="submit" className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Create Timetable</button>
@@ -406,7 +472,7 @@ const ScheduleManager = () => {
       ) : !timetable ? (
         <div className="bg-white rounded-lg shadow p-12 text-center">
           <p className="text-gray-500 text-lg mb-4">No active timetable for this branch</p>
-          <button onClick={() => setShowCreateForm(true)}
+          <button onClick={handleOpenCreateForm}
             className="bg-blue-600 text-white px-6 py-3 rounded hover:bg-blue-700">
             Create Timetable
           </button>
