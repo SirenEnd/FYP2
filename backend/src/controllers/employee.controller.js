@@ -14,9 +14,12 @@ const getAllEmployees = async (req, res) => {
         role: true,
         position: true,
         salary: true,
+        departmentId: true,
+        branchId: true,
         joinDate: true,
         isActive: true,
-        department: { select: { id: true, name: true } }
+        department: { select: { id: true, name: true } },
+        branch: { select: { id: true, name: true } }  // ← include branch
       },
       orderBy: { name: 'asc' }
     })
@@ -30,10 +33,7 @@ const getAllEmployees = async (req, res) => {
 const getStaffList = async (req, res) => {
   try {
     const staff = await prisma.employee.findMany({
-      where: { 
-        role: 'STAFF',
-        isActive: true 
-      },
+      where: { role: 'STAFF', isActive: true },
       select: {
         id: true,
         employeeId: true,
@@ -43,7 +43,6 @@ const getStaffList = async (req, res) => {
         role: true
       }
     })
-    console.log('Staff list:', staff) // Debug log
     res.json(staff)
   } catch (err) {
     console.error('Error:', err)
@@ -54,7 +53,7 @@ const getStaffList = async (req, res) => {
 const getEmployeeById = async (req, res) => {
   try {
     const id = parseInt(req.params.id)
-    
+
     if (isNaN(id)) {
       return res.status(400).json({ error: 'Invalid employee ID' })
     }
@@ -64,7 +63,7 @@ const getEmployeeById = async (req, res) => {
     }
 
     const employee = await prisma.employee.findUnique({
-      where: { id: id },
+      where: { id },
       select: {
         id: true,
         employeeId: true,
@@ -74,9 +73,12 @@ const getEmployeeById = async (req, res) => {
         role: true,
         position: true,
         salary: true,
+        departmentId: true,
+        branchId: true,
         joinDate: true,
         isActive: true,
-        department: { select: { id: true, name: true } }
+        department: { select: { id: true, name: true } },
+        branch: { select: { id: true, name: true } }
       }
     })
 
@@ -90,7 +92,7 @@ const getEmployeeById = async (req, res) => {
 
 const createEmployee = async (req, res) => {
   try {
-    const { employeeId, name, email, password, phone, role, position, salary, departmentId } = req.body
+    const { employeeId, name, email, password, phone, role, position, salary, departmentId, branchId } = req.body
 
     if (!employeeId || !name || !email || !password || !departmentId) {
       return res.status(400).json({ error: 'employeeId, name, email, password and departmentId are required' })
@@ -109,11 +111,12 @@ const createEmployee = async (req, res) => {
         name,
         email,
         password: hashedPassword,
-        phone,
+        phone: phone || null,
         role: role || 'STAFF',
-        position,
+        position: position || null,
         salary: parseFloat(salary) || 0,
-        departmentId: parseInt(departmentId)
+        departmentId: parseInt(departmentId),
+        branchId: branchId ? parseInt(branchId) : null   // ← was missing
       },
       select: {
         id: true,
@@ -123,7 +126,9 @@ const createEmployee = async (req, res) => {
         role: true,
         position: true,
         salary: true,
-        department: { select: { id: true, name: true } }
+        branchId: true,
+        department: { select: { id: true, name: true } },
+        branch: { select: { id: true, name: true } }
       }
     })
 
@@ -137,20 +142,28 @@ const createEmployee = async (req, res) => {
 const updateEmployee = async (req, res) => {
   try {
     const id = parseInt(req.params.id)
-    const { name, email, phone, role, position, salary, departmentId, isActive } = req.body
+    const { name, email, password, phone, role, position, salary, departmentId, branchId, isActive } = req.body
+
+    // Build update payload — only include fields that were actually sent
+    const data = {}
+    if (name !== undefined)           data.name = name
+    if (email !== undefined)          data.email = email
+    if (phone !== undefined)          data.phone = phone || null
+    if (role !== undefined)           data.role = role
+    if (position !== undefined)       data.position = position || null
+    if (salary !== undefined)         data.salary = parseFloat(salary)          // ← fixed: was skipping 0
+    if (departmentId !== undefined)   data.departmentId = parseInt(departmentId)
+    if (branchId !== undefined)       data.branchId = branchId ? parseInt(branchId) : null  // ← was missing
+    if (isActive !== undefined)       data.isActive = isActive
+
+    // Only hash + update password if a new one was provided
+    if (password && password.trim() !== '') {
+      data.password = await bcrypt.hash(password, 10)
+    }
 
     const employee = await prisma.employee.update({
       where: { id },
-      data: {
-        ...(name && { name }),
-        ...(email && { email }),
-        ...(phone && { phone }),
-        ...(role && { role }),
-        ...(position && { position }),
-        ...(salary && { salary: parseFloat(salary) }),
-        ...(departmentId && { departmentId: parseInt(departmentId) }),
-        ...(isActive !== undefined && { isActive })
-      },
+      data,
       select: {
         id: true,
         employeeId: true,
@@ -160,7 +173,9 @@ const updateEmployee = async (req, res) => {
         position: true,
         salary: true,
         isActive: true,
-        department: { select: { id: true, name: true } }
+        branchId: true,
+        department: { select: { id: true, name: true } },
+        branch: { select: { id: true, name: true } }
       }
     })
 
@@ -175,6 +190,11 @@ const deleteEmployee = async (req, res) => {
   try {
     const id = parseInt(req.params.id)
 
+    // Prevent deleting yourself
+    if (req.user.id === id) {
+      return res.status(400).json({ error: 'You cannot delete your own account' })
+    }
+
     await prisma.employee.update({
       where: { id },
       data: { isActive: false }
@@ -187,11 +207,11 @@ const deleteEmployee = async (req, res) => {
   }
 }
 
-module.exports = { 
-  getAllEmployees, 
+module.exports = {
+  getAllEmployees,
   getStaffList,
-  getEmployeeById, 
-  createEmployee, 
-  updateEmployee, 
-  deleteEmployee 
+  getEmployeeById,
+  createEmployee,
+  updateEmployee,
+  deleteEmployee
 }
