@@ -4,7 +4,11 @@ const { PrismaClient } = require('@prisma/client')
 const prisma = new PrismaClient()
 
 async function main() {
-  // Create departments first
+  const password = await bcrypt.hash('password123', 10)
+
+  // ─────────────────────────────
+  // DEPARTMENTS
+  // ─────────────────────────────
   const kitchen = await prisma.department.upsert({
     where: { name: 'Kitchen' },
     update: {},
@@ -17,9 +21,57 @@ async function main() {
     create: { name: 'Management' }
   })
 
-  const password = await bcrypt.hash('password123', 10)
+  const service = await prisma.department.upsert({
+    where: { name: 'Service' },
+    update: {},
+    create: { name: 'Service' }
+  })
 
-  // Create Admin
+  // ─────────────────────────────
+  // BRANCHES (adjusted ~100m safe radius centers)
+  // ─────────────────────────────
+  const branches = [
+    {
+      name: 'DevBranch',
+      address: 'Dev Branch HQ',
+      latitude: 2.949200,
+      longitude: 101.669300
+    },
+    {
+      name: 'AirPutih',
+      address: 'Air Putih Branch',
+      latitude: 3.832800,
+      longitude: 103.341620
+    },
+    {
+      name: 'InderaMahkota',
+      address: 'Indera Mahkota Branch',
+      latitude: 3.835300,
+      longitude: 103.301380
+    }
+  ]
+
+  const createdBranches = {}
+
+  for (const b of branches) {
+    createdBranches[b.name] = await prisma.branch.upsert({
+      where: { name: b.name },
+      update: {},
+      create: {
+        name: b.name,
+        address: b.address,
+        latitude: b.latitude,
+        longitude: b.longitude,
+        isActive: true
+      }
+    })
+  }
+
+  // ─────────────────────────────
+  // USERS
+  // ─────────────────────────────
+
+  // Admin
   await prisma.employee.upsert({
     where: { email: 'admin@restrohr.com' },
     update: {},
@@ -35,7 +87,7 @@ async function main() {
     }
   })
 
-  // Create Supervisor
+  // Supervisor 1
   await prisma.employee.upsert({
     where: { email: 'supervisor@restrohr.com' },
     update: {},
@@ -47,30 +99,77 @@ async function main() {
       role: 'SUPERVISOR',
       position: 'Kitchen Supervisor',
       salary: 3200,
-      departmentId: kitchen.id
+      departmentId: kitchen.id,
+      branchId: createdBranches.DevBranch.id
     }
   })
 
-  // Create Staff
+  // Supervisor 2 (NEW)
   await prisma.employee.upsert({
-    where: { email: 'staff@restrohr.com' },
+    where: { email: 'supervisor2@restrohr.com' },
     update: {},
     create: {
-      employeeId: 'RST-001',
-      name: 'Ahmad Rizal',
-      email: 'staff@restrohr.com',
+      employeeId: 'RST-008',
+      name: 'Aiman Rahman',
+      email: 'supervisor2@restrohr.com',
       password,
-      role: 'STAFF',
-      position: 'Kitchen Staff',
-      salary: 1800,
-      departmentId: kitchen.id
+      role: 'SUPERVISOR',
+      position: 'Branch Supervisor',
+      salary: 3200,
+      departmentId: management.id,
+      branchId: createdBranches.AirPutih.id
     }
   })
 
-  console.log('Seed complete! Test accounts created:')
-  console.log('   Admin      -> admin@restrohr.com / password123')
-  console.log('   Supervisor -> supervisor@restrohr.com / password123')
-  console.log('   Staff      -> staff@restrohr.com / password123')
+  // ─────────────────────────────
+  // STAFF GENERATION
+  // ─────────────────────────────
+
+  let staffCount = 1
+
+  // 10 Kitchen Staff
+  for (let i = 0; i < 10; i++) {
+    await prisma.employee.upsert({
+      where: { email: `kitchen${i}@restrohr.com` },
+      update: {},
+      create: {
+        employeeId: `KCH-${String(staffCount).padStart(3, '0')}`,
+        name: `Kitchen Staff ${i + 1}`,
+        email: `kitchen${i}@restrohr.com`,
+        password,
+        role: 'STAFF',
+        position: 'Kitchen Crew',
+        salary: 1800,
+        departmentId: kitchen.id,
+        branchId: i % 2 === 0 ? createdBranches.DevBranch.id : createdBranches.AirPutih.id
+      }
+    })
+    staffCount++
+  }
+
+  // 10 Service Staff
+  for (let i = 0; i < 10; i++) {
+    await prisma.employee.upsert({
+      where: { email: `service${i}@restrohr.com` },
+      update: {},
+      create: {
+        employeeId: `SRV-${String(staffCount).padStart(3, '0')}`,
+        name: `Service Staff ${i + 1}`,
+        email: `service${i}@restrohr.com`,
+        password,
+        role: 'STAFF',
+        position: 'Service Crew',
+        salary: 1800,
+        departmentId: service.id,
+        branchId: i % 2 === 0 ? createdBranches.AirPutih.id : createdBranches.InderaMahkota.id
+      }
+    })
+    staffCount++
+  }
+
+  console.log('Seed complete!')
+  console.log('Branches created: DevBranch, AirPutih, InderaMahkota')
+  console.log('Users created: 1 Admin, 2 Supervisors, 20 Staff')
 }
 
 main()
