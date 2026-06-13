@@ -5,18 +5,18 @@ function randomBetween(min, max) {
   return Math.random() * (max - min) + min
 }
 
-// generate small GPS offset (~100m radius)
-function generateNearbyLocation(lat, lng) {
-  const radius = 0.0010 // ~100m
-
-  const newLat = lat + (Math.random() - 0.5) * radius
-  const newLng = lng + (Math.random() - 0.5) * radius
-
-  return { lat: newLat, lng: newLng }
+function chance(prob) {
+  return Math.random() < prob
 }
 
-function isWorkDay(probability = 0.8) {
-  return Math.random() < probability
+// ~100m GPS offset
+function generateNearbyLocation(lat, lng) {
+  const radius = 0.0010
+
+  return {
+    lat: lat + (Math.random() - 0.5) * radius,
+    lng: lng + (Math.random() - 0.5) * radius
+  }
 }
 
 function getDates(start, end) {
@@ -36,9 +36,10 @@ async function seed() {
     include: { branch: true }
   })
 
-  const start = new Date('2026-01-01')
-  const end = new Date('2026-04-30')
-  const dates = getDates(start, end)
+  const dates = getDates(
+    new Date('2026-01-01'),
+    new Date('2026-04-30')
+  )
 
   const records = []
 
@@ -49,19 +50,77 @@ async function seed() {
 
     for (const date of dates) {
 
-      const workChance = isSupervisor ? 0.9 : 0.8
-      if (!isWorkDay(workChance)) continue
+      // =========================
+      // ATTENDANCE PROBABILITY
+      // =========================
+      let attendanceChance
 
-      const baseHour = randomBetween(8, 11)
-      const workHours = isSupervisor ? randomBetween(6, 9) : randomBetween(5, 8)
+      if (emp.role === 'ADMIN') continue // admin excluded
+
+      if (isSupervisor) {
+        attendanceChance = 0.92
+      } else {
+        attendanceChance = 0.78
+      }
+
+      // skip absent days
+      if (!chance(attendanceChance)) continue
+
+      // =========================
+      // LATE ARRIVAL (realistic)
+      // =========================
+      const isLate = chance(isSupervisor ? 0.05 : 0.18)
+
+      const baseHour = isLate
+        ? randomBetween(10, 12)   // late arrival
+        : randomBetween(8, 10)    // normal arrival
 
       const clockIn = new Date(date)
-      clockIn.setHours(baseHour, Math.floor(randomBetween(0, 30)), 0)
+      clockIn.setHours(
+        Math.floor(baseHour),
+        Math.floor(randomBetween(0, 59)),
+        0
+      )
+
+      // =========================
+      // SHIFT LENGTH (realistic)
+      // =========================
+      let workHours
+
+      if (isSupervisor) {
+        workHours = randomBetween(6, 9)
+      } else {
+        workHours = randomBetween(5, 8)
+      }
+
+      // =========================
+      // EARLY LEAVE (rare)
+      // =========================
+      const leftEarly = chance(isSupervisor ? 0.05 : 0.12)
+
+      if (leftEarly) {
+        workHours -= randomBetween(0.5, 2)
+        if (workHours < 4) workHours = 4
+      }
 
       const clockOut = new Date(clockIn)
-      clockOut.setHours(clockIn.getHours() + workHours)
+      clockOut.setHours(clockIn.getHours() + Math.floor(workHours))
 
-      // GPS near branch (100m rule simulation)
+      // =========================
+      // OVERTIME (RARE)
+      // =========================
+      let overtimeHours = 0
+
+      const hasOvertime = chance(isSupervisor ? 0.12 : 0.08)
+
+      if (hasOvertime) {
+        overtimeHours = randomBetween(1, 3)
+        clockOut.setHours(clockOut.getHours() + Math.floor(overtimeHours))
+      }
+
+      // =========================
+      // GPS LOCATION
+      // =========================
       const location = generateNearbyLocation(
         emp.branch.latitude || 0,
         emp.branch.longitude || 0
@@ -72,7 +131,7 @@ async function seed() {
         branchId: emp.branchId,
         clockIn,
         clockOut,
-        totalHours: workHours,
+        totalHours: workHours + overtimeHours,
         status: 'PRESENT',
         date: new Date(date),
         latitude: location.lat,
@@ -86,7 +145,7 @@ async function seed() {
     skipDuplicates: true
   })
 
-  console.log(`✅ Inserted ${records.length} attendance records`)
+  console.log(`✅ Inserted ${records.length} realistic attendance records`)
 }
 
 seed()
