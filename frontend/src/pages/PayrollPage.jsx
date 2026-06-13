@@ -313,18 +313,18 @@ function PayrollRow({ record, onMarkPaid, onDelete, onView, isAdmin }) {
               onClick={handleDelete}
               disabled={isDeleting}
               className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all disabled:opacity-50"
-              title="Delete payroll"
+              title="Delete payroll record"
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
-      </td>
-    </tr>
+       </td>
+     </tr>
   )
 }
 
-// ── ADMIN / SUPERVISOR VIEW (Enhanced) ────────────────────────────
+// ── ADMIN / SUPERVISOR VIEW (Enhanced with always visible generate UI) ──
 export function PayrollAdmin({ role = 'ADMIN' }) {
   const isAdmin = role === 'ADMIN'
   const now = new Date()
@@ -340,7 +340,6 @@ export function PayrollAdmin({ role = 'ADMIN' }) {
   const [filterYear, setFilterYear] = useState(now.getFullYear())
   const [genMonth, setGenMonth] = useState(now.getMonth() + 1)
   const [genYear, setGenYear] = useState(now.getFullYear())
-  const [showGenForm, setShowGenForm] = useState(false)
   const [genResult, setGenResult] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
@@ -373,7 +372,6 @@ export function PayrollAdmin({ role = 'ADMIN' }) {
       setFilterYear(genYear)
       await fetchPayrolls()
       setToast({ message: `Generated ${data.processed} payroll records`, type: 'success' })
-      setShowGenForm(false)
     } catch (err) {
       const errorMsg = err.response?.data?.error || 'Failed to generate payroll'
       setError(errorMsg)
@@ -447,15 +445,6 @@ export function PayrollAdmin({ role = 'ADMIN' }) {
             {' · '}6 billable hrs/day · EPF 11% · SOCSO 0.5%
           </p>
         </div>
-        {isAdmin && (
-          <button
-            onClick={() => { setShowGenForm(!showGenForm); setGenResult(null) }}
-            className="flex items-center gap-2 bg-gradient-to-r from-slate-800 to-slate-900 hover:from-slate-700 hover:to-slate-800 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-all hover:shadow-lg"
-          >
-            {showGenForm ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-            {showGenForm ? "Hide" : "Generate"} Payroll
-          </button>
-        )}
       </div>
 
       {/* Global error */}
@@ -469,20 +458,25 @@ export function PayrollAdmin({ role = 'ADMIN' }) {
         </div>
       )}
 
-      {/* Generate Form */}
-      {showGenForm && isAdmin && (
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 mb-6 shadow-sm animate-fade-in">
-          <h3 className="font-bold text-slate-800 mb-4 text-sm uppercase tracking-wide flex items-center gap-2">
-            <Award className="w-4 h-4 text-emerald-600" />
-            Generate Monthly Payroll
-          </h3>
+      {/* Generate Form - Always Visible for Admins */}
+      {isAdmin && (
+        <div className="bg-gradient-to-r from-slate-50 to-white border border-slate-200 rounded-2xl p-5 mb-6 shadow-sm animate-fade-in">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">
+              <Award className="w-4 h-4 text-emerald-600" />
+            </div>
+            <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wide">
+              Generate Monthly Payroll
+            </h3>
+          </div>
+          
           <form onSubmit={handleGenerate} className="flex flex-wrap items-end gap-3">
             <div>
               <label className="block text-xs font-semibold text-slate-500 mb-1.5">Month</label>
               <select
                 value={genMonth}
                 onChange={(e) => setGenMonth(parseInt(e.target.value))}
-                className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
               >
                 {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
               </select>
@@ -492,7 +486,7 @@ export function PayrollAdmin({ role = 'ADMIN' }) {
               <select
                 value={genYear}
                 onChange={(e) => setGenYear(parseInt(e.target.value))}
-                className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
               >
                 {[2024, 2025, 2026].map((y) => <option key={y} value={y}>{y}</option>)}
               </select>
@@ -504,14 +498,7 @@ export function PayrollAdmin({ role = 'ADMIN' }) {
             >
               {generating
                 ? <><RefreshCw className="w-4 h-4 animate-spin" /> Processing…</>
-                : <><CheckCircle className="w-4 h-4" /> Generate</>}
-            </button>
-            <button
-              type="button"
-              onClick={() => { setShowGenForm(false); setGenResult(null) }}
-              className="text-sm font-medium text-slate-500 hover:text-slate-700 px-3 py-2 transition-colors"
-            >
-              Cancel
+                : <><CheckCircle className="w-4 h-4" /> Generate Payroll</>}
             </button>
           </form>
 
