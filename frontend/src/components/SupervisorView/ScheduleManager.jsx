@@ -10,8 +10,7 @@ const POSITION_COLORS = {
   'Kitchen Staff': { bg: 'bg-orange-500', light: 'bg-orange-50', ring: 'ring-orange-400', text: 'text-orange-700', badge: 'bg-orange-100 text-orange-700' },
   'Service Crew':  { bg: 'bg-blue-500',   light: 'bg-blue-50',   ring: 'ring-blue-400',   text: 'text-blue-700',   badge: 'bg-blue-100 text-blue-700' },
   'Supervisor':    { bg: 'bg-purple-500',  light: 'bg-purple-50', ring: 'ring-purple-400',  text: 'text-purple-700', badge: 'bg-purple-100 text-purple-700' },
-  'Management':    { bg: 'bg-red-500',     light: 'bg-red-50',    ring: 'ring-red-400',     text: 'text-red-700',    badge: 'bg-red-100 text-red-700' },
-  'Other':         { bg: 'bg-gray-500',    light: 'bg-gray-50',   ring: 'ring-gray-400',    text: 'text-gray-700',   badge: 'bg-gray-100 text-gray-700' },
+
 }
 
 const getPositionGroup = (employee) => {
@@ -312,7 +311,6 @@ const ScheduleManager = () => {
             ● {group}
           </span>
         ))}
-        <span className="px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">● Other</span>
         <span className="ml-4 px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
           ⟷ Drag cell to copy to another hour
         </span>
