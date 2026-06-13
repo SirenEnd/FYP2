@@ -152,6 +152,8 @@ const generatePayroll = async (req, res) => {
           grossSalary:     calc.grossSalary,
           netSalary:       calc.netSalary,
           advanceDeduction: calc.advanceDeduction,
+          attendedDays:     calc.attendedDays,       
+          totalHoursWorked: calc.totalHoursWorked,   
           status:          'PENDING',
         },
       })

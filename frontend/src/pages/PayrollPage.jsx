@@ -105,7 +105,7 @@ function PayslipModal({ payroll, onClose }) {
   const basePay = payroll.grossSalary - payroll.overtimePay
 
   const rows = [
-    { label: `Basic Pay (${payroll.attendedDays ?? '—'} days)`, value: basePay, positive: true },
+    { label: `Basic Pay (${payroll.attendedDays ?? '—'} days)`, value: payroll.basicSalary, positive: true },
     { label: `Overtime Pay (${payroll.overtimeHours}h × RM${HOURLY_RATE} × 1.5)`, value: payroll.overtimePay, positive: true },
     { label: 'Gross Salary', value: payroll.grossSalary, positive: true, bold: true },
     { label: 'EPF (Employee 11%)', value: -payroll.epfDeduction, positive: false },
@@ -209,9 +209,9 @@ Status: ${payroll.status}
           {/* Summary tiles */}
           <div className="grid grid-cols-3 gap-3 mb-5">
             {[
-              { label: 'Days Worked', value: payroll.attendedDays ?? '—', icon: <Calendar className="w-4 h-4" /> },
-              { label: 'Total Hours', value: `${payroll.totalHoursWorked ?? '—'}h`, icon: <Clock className="w-4 h-4" /> },
-              { label: 'Overtime Hrs', value: `${payroll.overtimeHours}h`, icon: <TrendingUp className="w-4 h-4" /> },
+              { label: 'Days Worked',  value: payroll.attendedDays ?? '—' },
+              { label: 'Total Hours',  value: payroll.totalHoursWorked ? `${payroll.totalHoursWorked}h` : '—' },
+              { label: 'Overtime Hrs', value: `${payroll.overtimeHours}h` },
             ].map((item) => (
               <div key={item.label} className="bg-slate-50 rounded-xl px-4 py-3 hover:bg-slate-100 transition-colors">
                 <div className="flex items-center gap-1 text-slate-400 mb-1">
