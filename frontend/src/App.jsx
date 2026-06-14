@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import useAuthStore from './stores/authStore'
+import useIsMobile from './hooks/useIsMobile'
+import DesktopOnly from './components/DesktopOnly'
 import Login from './pages/Login'
 import EmployeeManager from './components/AdminView/EmployeeManager'
 import ScheduleManager from './components/SupervisorView/ScheduleManager'
@@ -11,7 +13,7 @@ import { PayrollAdmin, PayrollStaff } from './pages/PayrollPage'
 
 const Dashboard = () => {
   const { user } = useAuthStore()
-  
+  const isMobile = useIsMobile()
   return (
     <div className="min-h-screen bg-gray-100">
       <nav className="bg-white shadow-md p-4">
@@ -51,19 +53,35 @@ const Dashboard = () => {
           )}
           
           {user?.role === 'ADMIN' && (
-            <a href="/payroll" className="block">
-              <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
+  
+            <a href={isMobile ? undefined : '/payroll'}
+              onClick={(e) => isMobile && e.preventDefault()}
+              className="block"
+            >
+              <div className={`bg-white rounded-lg shadow p-6 transition ${
+                isMobile ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg'
+              }`}>
                 <h3 className="text-lg font-semibold mb-2">💰 Payroll</h3>
-                <p className="text-gray-600 text-sm">Process monthly payroll</p>
+                <p className="text-gray-600 text-sm">
+                  {isMobile ? 'Desktop only' : 'Process monthly payroll'}
+                </p>
               </div>
             </a>
           )}
-          
+
           {(user?.role === 'ADMIN' || user?.role === 'SUPERVISOR') && (
-            <a href="/schedules" className="block">
-              <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
+            
+            <a href={isMobile ? undefined : '/schedules'}
+              onClick={(e) => isMobile && e.preventDefault()}
+              className="block"
+            >
+              <div className={`bg-white rounded-lg shadow p-6 transition ${
+                isMobile ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg'
+              }`}>
                 <h3 className="text-lg font-semibold mb-2">📅 Schedule Management</h3>
-                <p className="text-gray-600 text-sm">Create and manage shifts</p>
+                <p className="text-gray-600 text-sm">
+                  {isMobile ? 'Desktop only' : 'Create and manage shifts'}
+                </p>
               </div>
             </a>
           )}
@@ -126,6 +144,12 @@ const PayrollRoute = () => {
   return <PayrollAdmin role={user?.role} />
 }
 
+const MobileBlockedRoute = ({ children, feature }) => {
+  const isMobile = useIsMobile()
+  if (isMobile) return <DesktopOnly feature={feature} />
+  return children
+}
+
 
 
 function App() {
@@ -156,7 +180,9 @@ function App() {
           path="/schedules"
           element={
             <ProtectedRoute>
-              <ScheduleManager />
+              <MobileBlockedRoute feature="Schedule Management">
+                <ScheduleManager />
+              </MobileBlockedRoute>
             </ProtectedRoute>
           }
         />
@@ -196,14 +222,16 @@ function App() {
             </ProtectedRoute>
           }
         />
-        <Route 
-          path="/payroll" 
-          element={
-            <ProtectedRoute>
-              <PayrollRoute />
-            </ProtectedRoute>
-          } 
-          />
+                    <Route 
+                path="/payroll" 
+                element={
+                  <ProtectedRoute>
+                    <MobileBlockedRoute feature="Payroll">
+                      <PayrollRoute />
+                    </MobileBlockedRoute>
+                  </ProtectedRoute>
+                } 
+              />
       </Routes>
     </BrowserRouter>
   )
