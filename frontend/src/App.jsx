@@ -10,6 +10,7 @@ import Attendance from './components/StaffView/Attendance'
 import AttendanceReport from './components/SupervisorView/AttendanceReport'
 import LeavePage from './pages/LeavePage'
 import { PayrollAdmin, PayrollStaff } from './pages/PayrollPage'
+import TaskManager from './components/SupervisorView/TaskManager'
 
 const Dashboard = () => {
   const { user } = useAuthStore()
@@ -85,6 +86,22 @@ const Dashboard = () => {
               </div>
             </a>
           )}
+
+          {(user?.role === 'ADMIN' || user?.role === 'SUPERVISOR') && (
+            <a href={isMobile ? undefined : '/tasks'}
+              onClick={(e) => isMobile && e.preventDefault()}
+              className="block"
+            >
+              <div className={`bg-white rounded-lg shadow p-6 transition ${
+                isMobile ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg'
+              }`}>
+                <h3 className="text-lg font-semibold mb-2">🧹 Task Assignments</h3>
+                <p className="text-gray-600 text-sm">
+                  {isMobile ? 'Desktop only' : 'Assign cleaning, bartending & trash duties'}
+               </p>
+              </div>
+           </a>
+        )}
           
           <a href="/attendance" className="block">
             <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
@@ -192,6 +209,16 @@ function App() {
             <ProtectedRoute>
               <MySchedule />
             </ProtectedRoute>
+          }
+        />
+        <Route
+         path="/tasks"
+       element={
+          <ProtectedRoute>
+            <MobileBlockedRoute feature="Task Assignments">
+              <TaskManager />
+            </MobileBlockedRoute>
+                        </ProtectedRoute>
           }
         />
 

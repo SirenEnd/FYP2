@@ -19,6 +19,7 @@ model Branch {
   employees   Employee[]
   timetables  Timetable[]
   attendances Attendance[]
+  tasks       Task[]
 }
 
 // ─── DEPARTMENT ───────────────────────────────
@@ -54,6 +55,7 @@ model Employee {
   payrolls       Payroll[]
   performances   Performance[]
   timetableSlots TimetableSlot[]
+  tasks          Task[]
 
   salaryAdvances SalaryAdvance[]
 }
@@ -210,4 +212,34 @@ model Performance {
   quarter    Int
   year       Int
   createdAt  DateTime @default(now())
+}
+
+// ─── TASK ASSIGNMENT ──────────────────────────
+enum TaskType {
+  FILTER_CLEANING   // weekly
+  TOILET_CLEANING   // daily
+  BARTENDING        // daily
+  TRASH_DISPOSAL    // daily
+}
+
+enum TaskStatus {
+  PENDING
+  DONE
+}
+
+model Task {
+  id         Int        @id @default(autoincrement())
+  taskType   TaskType
+  date       DateTime
+  employeeId Int
+  employee   Employee   @relation(fields: [employeeId], references: [id])
+  branchId   Int?
+  branch     Branch?    @relation(fields: [branchId], references: [id])
+  status     TaskStatus @default(PENDING)
+  notes      String?
+  assignedBy Int
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  @@unique([taskType, date, employeeId])
 }
