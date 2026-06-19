@@ -10,6 +10,7 @@ const POSITION_COLORS = {
   'Kitchen Staff': { bg: 'bg-orange-500', light: 'bg-orange-50', ring: 'ring-orange-400', text: 'text-orange-700', badge: 'bg-orange-100 text-orange-700' },
   'Service Crew':  { bg: 'bg-blue-500',   light: 'bg-blue-50',   ring: 'ring-blue-400',   text: 'text-blue-700',   badge: 'bg-blue-100 text-blue-700' },
   'Supervisor':    { bg: 'bg-purple-500',  light: 'bg-purple-50', ring: 'ring-purple-400',  text: 'text-purple-700', badge: 'bg-purple-100 text-purple-700' },
+  'Other':         { bg: 'bg-gray-500',    light: 'bg-gray-50',   ring: 'ring-gray-400',    text: 'text-gray-700',   badge: 'bg-gray-100 text-gray-700' },
 
 }
 
@@ -31,7 +32,7 @@ const getDefaultStation = (position) => {
 
 const getSlotColor = (employee) => {
   const group = getPositionGroup(employee)
-  return POSITION_COLORS[group] || POSITION_COLORS['Other']
+  return POSITION_COLORS[group] || { bg: 'bg-gray-400', light: 'bg-gray-50', ring: 'ring-gray-300', text: 'text-gray-600', badge: 'bg-gray-100 text-gray-600' }
 }
 
 // Helper function to get formatted date for timetable name
@@ -274,6 +275,7 @@ const ScheduleManager = () => {
     const groups = {}
     employees.forEach(emp => {
       const group = getPositionGroup(emp)
+      if (group === 'Management' || group === 'Other') return
       if (!groups[group]) groups[group] = []
       groups[group].push(emp)
     })
@@ -281,7 +283,11 @@ const ScheduleManager = () => {
   }, [employees])
 
   const filteredEmployees = useMemo(() => {
-    let list = positionFilter === 'All' ? employees : (groupedEmployees[positionFilter] || [])
+    const assignable = employees.filter(e => {
+    const g = getPositionGroup(e)
+      return g !== 'Management' && g !== 'Other'
+    })
+    let list = positionFilter === 'All' ? assignable : (groupedEmployees[positionFilter] || [])
     if (searchName) list = list.filter(e => e.name.toLowerCase().includes(searchName.toLowerCase()))
     return list
   }, [employees, groupedEmployees, positionFilter, searchName])
