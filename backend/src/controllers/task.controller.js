@@ -5,7 +5,7 @@ const TASK_TYPES = ['FILTER_CLEANING', 'TOILET_CLEANING', 'BARTENDING', 'TRASH_D
 const isServiceCrew = (employee) => {
   const pos = (employee.position || '').toLowerCase()
   return employee.role === 'STAFF' && (
-    pos.includes('service') || pos.includes('waiter') ||
+    pos.includes('kitchen crew') || pos.includes('waiter') ||
     pos.includes('waitress') || pos.includes('cashier') || pos.includes('counter')
   )
 }
