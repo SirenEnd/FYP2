@@ -11,6 +11,7 @@ import AttendanceReport from './components/SupervisorView/AttendanceReport'
 import LeavePage from './pages/LeavePage'
 import { PayrollAdmin, PayrollStaff } from './pages/PayrollPage'
 import TaskManager from './components/SupervisorView/TaskManager'
+import MyTasks from './components/StaffView/MyTasks'
 
 const Dashboard = () => {
   const { user } = useAuthStore()
@@ -102,6 +103,26 @@ const Dashboard = () => {
               </div>
            </a>
         )}
+
+        // add this dashboard card, e.g. right after the "My Schedule" card
+                  {user?.role === 'STAFF' && (
+                    <a href="/my-tasks" className="block">
+                      <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
+                        <h3 className="text-lg font-semibold mb-2">🧹 My Tasks</h3>
+                        <p className="text-gray-600 text-sm">View your cleaning, bartending & trash duties</p>
+                      </div>
+                    </a>
+                  )}
+
+                  // add this route — note: NOT wrapped in MobileBlockedRoute, so it works on phones
+                  <Route
+                    path="/my-tasks"
+                    element={
+                      <ProtectedRoute>
+                        <MyTasks />
+                      </ProtectedRoute>
+                    }
+                  />
           
           <a href="/attendance" className="block">
             <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">

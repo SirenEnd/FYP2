@@ -170,5 +170,29 @@ const deleteTask = async (req, res) => {
     res.status(500).json({ error: 'Internal server error' })
   }
 }
+// PUT /api/tasks/my/:id/status — Employee marks their own task done/pending
+const updateMyTaskStatus = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id)
+    const employeeId = req.user.id
+    const { status } = req.body
 
-module.exports = { getTasks, getMyTasks, createTask, updateTask, deleteTask }
+    if (!['PENDING', 'DONE'].includes(status)) {
+      return res.status(400).json({ error: 'status must be PENDING or DONE' })
+    }
+
+    const task = await prisma.task.findUnique({ where: { id } })
+    if (!task) return res.status(404).json({ error: 'Task not found' })
+    if (task.employeeId !== employeeId) {
+      return res.status(403).json({ error: 'You can only update your own tasks' })
+    }
+
+    const updated = await prisma.task.update({ where: { id }, data: { status } })
+    res.json({ message: 'Task status updated', task: updated })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+}
+
+module.exports = { getTasks, getMyTasks, createTask, updateTask, deleteTask, updateMyTaskStatus }

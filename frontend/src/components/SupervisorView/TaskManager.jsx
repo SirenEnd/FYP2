@@ -50,6 +50,13 @@ const TaskManager = () => {
     })
   }, [weekStart])
 
+  // Workload counts per employee for the week currently in view
+  const employeeTaskCounts = useMemo(() => {
+    const counts = {}
+    tasks.forEach(t => { counts[t.employeeId] = (counts[t.employeeId] || 0) + 1 })
+    return counts
+  }, [tasks])
+
   useEffect(() => { fetchBranches(); fetchEmployees() }, [])
   useEffect(() => { fetchTasks() }, [weekStart, selectedBranch])
 
@@ -171,12 +178,19 @@ const TaskManager = () => {
             <button onClick={() => setAssignCell(null)} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
           </div>
           <div className="flex gap-3 items-center flex-wrap">
-            <select value={selectedEmployee} onChange={(e) => setSelectedEmployee(e.target.value)}
-              className="border rounded p-2 min-w-64">
+            <select value={selectedEmployee} onChange={(e) => setSelectedEmployee(e.target.value)} className="border rounded p-2 min-w-64">
               <option value="">Select Service Crew staff...</option>
-              {branchEmployees.map(emp => (
-                <option key={emp.id} value={emp.id}>{emp.name} ({emp.employeeId})</option>
-              ))}
+              {branchEmployees
+                .slice()
+                .sort((a, b) => (employeeTaskCounts[a.id] || 0) - (employeeTaskCounts[b.id] || 0))
+                .map(emp => {
+                  const count = employeeTaskCounts[emp.id] || 0
+                  return (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.name} ({emp.employeeId}) — {count} task{count !== 1 ? 's' : ''} this week
+                    </option>
+                  )
+                })}
             </select>
             <button onClick={handleAssign} disabled={!selectedEmployee}
               className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50">
@@ -200,11 +214,16 @@ const TaskManager = () => {
                 <th className="border border-gray-200 p-2 text-xs font-semibold text-gray-600 w-40 sticky left-0 bg-gray-100 z-10">
                   Task
                 </th>
-                {weekDays.map((d, i) => (
-                  <th key={i} className="border border-gray-200 p-2 text-xs font-semibold text-gray-600 text-center min-w-32">
-                    {DAY_LABELS[i]}<br /><span className="font-normal text-gray-400">{fmtShort(d)}</span>
-                  </th>
-                ))}
+                {weekDays.map((d, i) => {
+                  const today = sameDay(d, new Date())
+                  return (
+                    <th key={i} className={`border border-gray-200 p-2 text-xs font-semibold text-center min-w-32
+                      ${today ? 'bg-blue-600 text-white' : 'text-gray-600'}`}>
+                      {DAY_LABELS[i]}<br />
+                      <span className={`font-normal ${today ? 'text-blue-100' : 'text-gray-400'}`}>{fmtShort(d)}</span>
+                    </th>
+                  )
+                })}
               </tr>
             </thead>
             <tbody>
@@ -219,16 +238,22 @@ const TaskManager = () => {
                     return (
                       <td key={i} className="border border-gray-200 p-1 align-top" style={{ minHeight: '60px' }}>
                         <div className="flex flex-col gap-1">
-                          {cellTasks.map(t => (
-                            <div key={t.id}
-                              className={`${taskType.color} text-white rounded px-2 py-1 text-xs flex items-center justify-between gap-1 group`}>
-                              <span className="truncate">{t.employee.name}</span>
-                              <button onClick={() => handleRemove(t.id)}
-                                className="text-white/60 hover:text-white flex-shrink-0 font-bold opacity-0 group-hover:opacity-100 transition-opacity">
-                                ✕
-                              </button>
-                            </div>
-                          ))}
+                          {cellTasks.map(t => {
+                            const isDone = t.status === 'DONE'
+                            return (
+                              <div key={t.id}
+                                className={`rounded px-2 py-1 text-xs flex items-center justify-between gap-1 group transition-colors
+                                  ${isDone ? 'bg-gray-200 text-gray-500' : `${taskType.color} text-white`}`}>
+                                <span className={`truncate flex items-center gap-1 ${isDone ? 'line-through' : ''}`}>
+                                  {isDone && <span className="flex-shrink-0">✓</span>}{t.employee.name}
+                                </span>
+                                <button onClick={() => handleRemove(t.id)}
+                                  className={`flex-shrink-0 font-bold opacity-0 group-hover:opacity-100 transition-opacity ${isDone ? 'text-gray-400 hover:text-gray-600' : 'text-white/60 hover:text-white'}`}>
+                                  ✕
+                                </button>
+                              </div>
+                            )
+                          })}
                           <button onClick={() => openAssign(taskType.key, d)}
                             className="text-xs text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded py-1 transition-colors">
                             + Assign
