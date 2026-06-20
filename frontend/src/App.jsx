@@ -104,26 +104,6 @@ const Dashboard = () => {
            </a>
         )}
 
-        // add this dashboard card, e.g. right after the "My Schedule" card
-                  {user?.role === 'STAFF' && (
-                    <a href="/my-tasks" className="block">
-                      <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
-                        <h3 className="text-lg font-semibold mb-2">🧹 My Tasks</h3>
-                        <p className="text-gray-600 text-sm">View your cleaning, bartending & trash duties</p>
-                      </div>
-                    </a>
-                  )}
-
-                  // add this route — note: NOT wrapped in MobileBlockedRoute, so it works on phones
-                  <Route
-                    path="/my-tasks"
-                    element={
-                      <ProtectedRoute>
-                        <MyTasks />
-                      </ProtectedRoute>
-                    }
-                  />
-          
           <a href="/attendance" className="block">
             <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
               <h3 className="text-lg font-semibold mb-2">⏰ Attendance</h3>
@@ -137,6 +117,15 @@ const Dashboard = () => {
               <p className="text-gray-600 text-sm">View your upcoming shifts</p>
             </div>
           </a>
+
+          {user?.role === 'STAFF' && (
+            <a href="/my-tasks" className="block">
+              <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
+                <h3 className="text-lg font-semibold mb-2">🧹 My Tasks</h3>
+                <p className="text-gray-600 text-sm">View your cleaning, bartending & trash duties</p>
+              </div>
+            </a>
+          )}
 
           {(user?.role === 'ADMIN' || user?.role === 'SUPERVISOR') && (
             <a href="/attendance-report" className="block">
@@ -240,6 +229,14 @@ function App() {
               <TaskManager />
             </MobileBlockedRoute>
                         </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/my-tasks"
+          element={
+            <ProtectedRoute>
+              <MyTasks />
+            </ProtectedRoute>
           }
         />
 

@@ -32,7 +32,7 @@ const Login = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <div className="bg-white p-8 rounded-lg shadow-md w-96">
-        <h1 className="text-2xl font-bold text-center mb-6">AsohHRMS Login</h1>
+        <h1 className="text-2xl font-bold text-center mb-6">AsohKopiHRMS Login</h1>
         
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
@@ -75,10 +75,7 @@ const Login = () => {
         </form>
         
         <div className="mt-4 text-xs text-gray-500 text-center">
-          <p>Test credentials:</p>
-          <p>admin@restrohr.com / password123</p>
-          <p>supervisor@restrohr.com / password123</p>
-          <p>staff@restrohr.com / password123</p>
+          
         </div>
       </div>
     </div>
