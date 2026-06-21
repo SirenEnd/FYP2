@@ -12,59 +12,33 @@ const Attendance = () => {
   const [history, setHistory] = useState([])
   const [todaySessions, setTodaySessions] = useState([])
 
-  useEffect(() => {
-    fetchTodayAttendance()
-    fetchStats()
-    fetchTodaySessions()
-  }, [])
-
-  useEffect(() => {
-    fetchHistory()
-  }, [selectedMonth, selectedYear])
-
-  useEffect(() => {
-  // Force sync with backend on component mount
-  const syncWithBackend = async () => {
-    try {
-      const response = await api.get('/attendance/today')
-      if (response.data.message === 'No active session' || !response.data.clockIn) {
-        setTodayAttendance(null)
-      } else {
-        setTodayAttendance(response.data)
-      }
-    } catch (error) {
-      console.error('Sync error:', error)
-      setTodayAttendance(null)
-    }
-  }
-  syncWithBackend()
-}, [])
-
   const fetchTodayAttendance = async () => {
     try {
       const response = await api.get('/attendance/today')
-      setTodayAttendance(response.data || null)
+      const data = response.data
+      // Backend sends {message:'No active session', attendance:null} when nothing is active
+      const hasActiveSession = data && data.clockIn && !data.message
+      setTodayAttendance(hasActiveSession ? data : null)
     } catch (error) {
       console.error('Failed to fetch attendance:', error)
+      setTodayAttendance(null)
     } finally {
       setLoading(false)
     }
   }
 
-      const fetchTodaySessions = async () => {
-      try {
-        const response = await api.get(`/attendance/my?month=${new Date().getMonth() + 1}&year=${new Date().getFullYear()}`)
-        const today = new Date().toDateString()
-        const todaysRecords = response.data.records.filter(record => 
-          new Date(record.date).toDateString() === today
-        )
-        // Debug: log each session to see what's happening
-        console.log('Today sessions:', todaysRecords)
-        setTodaySessions(todaysRecords)
-      } catch (error) {
-        console.error('Failed to fetch today sessions:', error)
-      }
+  const fetchTodaySessions = async () => {
+    try {
+      const response = await api.get(`/attendance/my?month=${new Date().getMonth() + 1}&year=${new Date().getFullYear()}`)
+      const today = new Date().toDateString()
+      const todaysRecords = response.data.records.filter(record =>
+        new Date(record.date).toDateString() === today
+      )
+      setTodaySessions(todaysRecords)
+    } catch (error) {
+      console.error('Failed to fetch today sessions:', error)
     }
+  }
 
   const fetchStats = async () => {
     try {
@@ -84,83 +58,108 @@ const Attendance = () => {
     }
   }
 
+  // Single source of truth on mount — no duplicate/competing effects
+  useEffect(() => {
+    fetchTodayAttendance()
+    fetchStats()
+    fetchTodaySessions()
+  }, [])
+
+  useEffect(() => {
+    fetchHistory()
+  }, [selectedMonth, selectedYear])
+
+  // Refetch whenever the tab regains focus/visibility, so the page
+  // never silently shows stale state without a manual refresh
+  useEffect(() => {
+    const refresh = () => {
+      fetchTodayAttendance()
+      fetchTodaySessions()
+    }
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') refresh()
+    }
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [])
+
   const handleClockIn = async () => {
-  setLoading(true)
+    setLoading(true)
 
-  if (!navigator.geolocation) {
-    alert('Geolocation is not supported by your browser.')
-    setLoading(false)
-    return
-  }
-
-  navigator.geolocation.getCurrentPosition(
-    async (position) => {
-      try {
-        const { latitude, longitude } = position.coords
-        console.log('My coordinates:', latitude, longitude)
-        console.log('Accuracy:', position.coords.accuracy, 'meters')
-        const response = await api.post('/attendance/clockin', { latitude, longitude })
-        setTodayAttendance(response.data.attendance)
-        await fetchStats()
-        await fetchTodaySessions()
-        alert(`✅ ${response.data.message} — ${response.data.distanceMeters}m from branch`)
-      } catch (error) {
-        const errData = error.response?.data
-        if (errData?.distanceMeters) {
-          alert(`📍 Too far from branch.\nNearest: ${errData.nearestBranch} (${errData.distanceMeters}m away)\nMust be within ${errData.requiredMeters}m.`)
-        } else {
-          alert(errData?.error || 'Failed to clock in')
-        }
-      } finally {
-        setLoading(false)
-      }
-    },
-    (err) => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser.')
       setLoading(false)
-      if (err.code === 1) alert('📍 Location access denied. Please enable GPS to clock in.')
-      else if (err.code === 2) alert('📍 Location unavailable. Please try again.')
-      else alert('📍 Could not get your location. Please try again.')
-    },
-    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-  )
-}
-const handleClockOut = async () => {
-  try {
-    await api.post('/attendance/clockout')
-    // Force reset the state to null so Clock In button appears
-    setTodayAttendance(null)
-    await fetchStats()
-    await fetchTodaySessions()
-    alert('Clocked out successfully!')
-  } catch (error) {
-    alert(error.response?.data?.error || 'Failed to clock out')
-  }
-}
+      return
+    }
 
-const handleBreakStart = async () => {
-  try {
-    await api.post('/attendance/break/start')
-    await fetchTodayAttendance()
-    await fetchTodaySessions() // Add this
-    alert('Break started!')
-  } catch (error) {
-    alert(error.response?.data?.error || 'Failed to start break')
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords
+          const response = await api.post('/attendance/clockin', { latitude, longitude })
+          // Resync from server instead of trusting the local response shape
+          await fetchTodayAttendance()
+          await fetchStats()
+          await fetchTodaySessions()
+          alert(`✅ ${response.data.message} — ${response.data.distanceMeters}m from branch`)
+        } catch (error) {
+          const errData = error.response?.data
+          if (errData?.distanceMeters) {
+            alert(`📍 Too far from branch.\nNearest: ${errData.nearestBranch} (${errData.distanceMeters}m away)\nMust be within ${errData.requiredMeters}m.`)
+          } else {
+            alert(errData?.error || 'Failed to clock in')
+          }
+        } finally {
+          setLoading(false)
+        }
+      },
+      (err) => {
+        setLoading(false)
+        if (err.code === 1) alert('📍 Location access denied. Please enable GPS to clock in.')
+        else if (err.code === 2) alert('📍 Location unavailable. Please try again.')
+        else alert('📍 Could not get your location. Please try again.')
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    )
   }
-}
 
-const handleBreakEnd = async () => {
-  try {
-    await api.post('/attendance/break/end')
-    await fetchTodayAttendance()
-    await fetchTodaySessions() // Add this
-    alert('Break ended!')
-  } catch (error) {
-    alert(error.response?.data?.error || 'Failed to end break')
+  const handleClockOut = async () => {
+    try {
+      await api.post('/attendance/clockout')
+      await fetchTodayAttendance()
+      await fetchStats()
+      await fetchTodaySessions()
+      alert('Clocked out successfully!')
+    } catch (error) {
+      alert(error.response?.data?.error || 'Failed to clock out')
+    }
   }
-}
-  
 
-  
+  const handleBreakStart = async () => {
+    try {
+      await api.post('/attendance/break/start')
+      await fetchTodayAttendance()
+      await fetchTodaySessions()
+      alert('Break started!')
+    } catch (error) {
+      alert(error.response?.data?.error || 'Failed to start break')
+    }
+  }
+
+  const handleBreakEnd = async () => {
+    try {
+      await api.post('/attendance/break/end')
+      await fetchTodayAttendance()
+      await fetchTodaySessions()
+      alert('Break ended!')
+    } catch (error) {
+      alert(error.response?.data?.error || 'Failed to end break')
+    }
+  }
 
   const isClockedIn = todayAttendance && !todayAttendance.clockOut
   const isOnBreak = todayAttendance?.breakStart && !todayAttendance?.breakEnd
@@ -171,13 +170,12 @@ const handleBreakEnd = async () => {
 
   return (
     <div className="container mx-auto p-6">
-       <BackButton />
+      <BackButton />
       <h2 className="text-2xl font-bold mb-6">Attendance Management</h2>
 
-      {/* Today's Attendance Card */}
       <div className="bg-white rounded-lg shadow p-6 mb-6">
         <h3 className="text-lg font-semibold mb-4">Today's Attendance</h3>
-        
+
         <div className="flex flex-wrap gap-3 mb-4">
           {!todayAttendance ? (
             <button
@@ -206,7 +204,7 @@ const handleBreakEnd = async () => {
                   End Break
                 </button>
               )}
-              
+
               <button
                 onClick={handleClockOut}
                 className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700"
@@ -228,7 +226,7 @@ const handleBreakEnd = async () => {
               <p>☕ Break ended: {new Date(todayAttendance.breakEnd).toLocaleTimeString()}</p>
             )}
             <p className="font-medium mt-2">
-              Status: 
+              Status:
               <span className={`ml-1 px-2 py-1 rounded text-xs ${
                 todayAttendance.status === 'PRESENT' ? 'bg-green-100 text-green-700' :
                 todayAttendance.status === 'LATE' ? 'bg-yellow-100 text-yellow-700' :
@@ -241,33 +239,31 @@ const handleBreakEnd = async () => {
         )}
       </div>
 
-                {/* Today's Sessions (shows all clock in/out for today) */}
-        {todaySessions.length > 0 && (
-          <div className="bg-white rounded-lg shadow p-6 mb-6">
-            <h3 className="text-lg font-semibold mb-4">Today's Work Sessions</h3>
-            <div className="space-y-2">
-              {todaySessions.map((session, index) => (
-                <div key={session.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <span className="font-medium text-sm">Session {index + 1}</span>
-                    <span className="text-sm text-gray-600">
-                      {new Date(session.clockIn).toLocaleTimeString()}
-                    </span>
-                    <span className="text-gray-400">→</span>
-                    <span className="text-sm text-gray-600">
-                      {session.clockOut ? new Date(session.clockOut).toLocaleTimeString() : 'Active'}
-                    </span>
-                  </div>
-                  <span className="text-sm font-medium text-blue-600">
-                    {session.clockOut ? `${session.totalHours} hrs` : 'In progress'}
+      {todaySessions.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-6 mb-6">
+          <h3 className="text-lg font-semibold mb-4">Today's Work Sessions</h3>
+          <div className="space-y-2">
+            {todaySessions.map((session, index) => (
+              <div key={session.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <span className="font-medium text-sm">Session {index + 1}</span>
+                  <span className="text-sm text-gray-600">
+                    {new Date(session.clockIn).toLocaleTimeString()}
+                  </span>
+                  <span className="text-gray-400">→</span>
+                  <span className="text-sm text-gray-600">
+                    {session.clockOut ? new Date(session.clockOut).toLocaleTimeString() : 'Active'}
                   </span>
                 </div>
-              ))}
-            </div>
+                <span className="text-sm font-medium text-blue-600">
+                  {session.clockOut ? `${session.totalHours} hrs` : 'In progress'}
+                </span>
+              </div>
+            ))}
           </div>
-        )}
+        </div>
+      )}
 
-      {/* Statistics Cards */}
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-white rounded-lg shadow p-4">
@@ -289,12 +285,11 @@ const handleBreakEnd = async () => {
         </div>
       )}
 
-      {/* History Section */}
       <div className="bg-white rounded-lg shadow">
         <div className="px-6 py-4 bg-gray-50 border-b">
           <h3 className="text-lg font-semibold">Attendance History</h3>
         </div>
-        
+
         <div className="p-4 flex gap-4 border-b">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Month</label>
@@ -310,7 +305,7 @@ const handleBreakEnd = async () => {
               ))}
             </select>
           </div>
-          
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
             <select
