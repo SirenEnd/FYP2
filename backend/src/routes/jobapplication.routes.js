@@ -7,7 +7,7 @@ const {
   getApplicationById,
   updateApplicationStatus,
   deleteApplication
-} = require('../controllers/jobApplication.controller')
+} = require('../controllers/JobApplication.controller')  // capital J
 
 // Public — anyone can apply via the "Join Our Crew" page, no login required
 router.post('/', submitApplication)
