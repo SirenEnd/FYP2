@@ -34,7 +34,7 @@ app.use('/api/payroll', payrollRoutes)
 app.use('/api/branches', branchRoutes)
 app.use('/api/timetable', timetableRoutes)
 app.use('/api/tasks', taskRoutes)
-app.use('/api/job-applications', jobApplicationRoutes)
+app.use('/api/job-applications', jobapplicationRoutes)
 
 // Health check
 app.get('/', (req, res) => {
