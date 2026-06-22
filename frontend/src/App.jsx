@@ -3,6 +3,7 @@ import useAuthStore from './stores/authStore'
 import useIsMobile from './hooks/useIsMobile'
 import DesktopOnly from './components/DesktopOnly'
 import Login from './pages/Login'
+import JobApplicationForm from './pages/JobApplicationForm'
 import EmployeeManager from './components/AdminView/EmployeeManager'
 import ScheduleManager from './components/SupervisorView/ScheduleManager'
 import MySchedule from './components/StaffView/MySchedule'
@@ -12,6 +13,7 @@ import LeavePage from './pages/LeavePage'
 import { PayrollAdmin, PayrollStaff } from './pages/PayrollPage'
 import TaskManager from './components/SupervisorView/TaskManager'
 import MyTasks from './components/StaffView/MyTasks'
+import JobApplications from './components/SupervisorView/JobApplications'
 
 const Dashboard = () => {
   const { user } = useAuthStore()
@@ -147,6 +149,15 @@ const Dashboard = () => {
               </p>
             </div>
           </a>
+
+          {(user?.role === 'ADMIN' || user?.role === 'SUPERVISOR') && (
+            <a href="/job-applications" className="block">
+              <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
+                <h3 className="text-lg font-semibold mb-2">📝 Job Applications</h3>
+                <p className="text-gray-600 text-sm">Review applications from "Join Our Crew"</p>
+              </div>
+            </a>
+          )}
         </div>
       </main>
     </div>
@@ -164,6 +175,15 @@ const AdminRoute = ({ children }) => {
   if (user?.role !== 'ADMIN') return <Navigate to="/dashboard" />
   return children
 }
+
+// Admin or Supervisor only (e.g. reviewing job applications)
+const StaffManagementRoute = ({ children }) => {
+  const { isAuthenticated, user } = useAuthStore()
+  if (!isAuthenticated) return <Navigate to="/login" />
+  if (user?.role !== 'ADMIN' && user?.role !== 'SUPERVISOR') return <Navigate to="/dashboard" />
+  return children
+}
+
 // Add a PayrollRoute helper
 const PayrollRoute = () => {
   const { user } = useAuthStore()
@@ -184,6 +204,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/apply" element={<JobApplicationForm />} />
         <Route
           path="/dashboard"
           element={
@@ -277,6 +298,16 @@ function App() {
                   </ProtectedRoute>
                 } 
               />
+
+        {/* Job Applications Route — Admin & Supervisor */}
+        <Route
+          path="/job-applications"
+          element={
+            <StaffManagementRoute>
+              <JobApplications />
+            </StaffManagementRoute>
+          }
+        />
       </Routes>
     </BrowserRouter>
   )

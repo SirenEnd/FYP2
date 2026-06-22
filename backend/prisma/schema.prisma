@@ -243,3 +243,31 @@ model Task {
 
   @@unique([taskType, date, employeeId])
 }
+
+// ─── JOB APPLICATION ──────────────────────────
+enum ApplicantPosition {
+  KITCHEN_STAFF
+  SERVICE_CREW
+}
+
+enum ApplicationStatus {
+  PENDING
+  REVIEWED
+  CONTACTED
+  REJECTED
+}
+
+model JobApplication {
+  id                Int               @id @default(autoincrement())
+  name              String
+  email             String
+  phone             String
+  address           String
+  position          ApplicantPosition
+  typhoidVaccinated Boolean
+  vaccinationYear   Int?
+  status            ApplicationStatus @default(PENDING)
+  reviewedBy        Int?
+  reviewedAt        DateTime?
+  createdAt         DateTime          @default(now())
+}

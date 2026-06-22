@@ -23,6 +23,7 @@ const payrollRoutes = require('./routes/payroll.routes')
 const branchRoutes = require('./routes/branch.routes')
 const timetableRoutes = require('./routes/timetable.routes')
 const taskRoutes = require('./routes/task.routes')
+const jobApplicationRoutes = require('./routes/jobApplication.routes')
 
 app.use('/api/auth', authRoutes)
 app.use('/api/employees', employeeRoutes)
@@ -33,6 +34,7 @@ app.use('/api/payroll', payrollRoutes)
 app.use('/api/branches', branchRoutes)
 app.use('/api/timetable', timetableRoutes)
 app.use('/api/tasks', taskRoutes)
+app.use('/api/job-applications', jobApplicationRoutes)
 
 // Health check
 app.get('/', (req, res) => {

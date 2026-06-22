@@ -73,9 +73,15 @@ const Login = () => {
             {loading ? 'Logging in...' : 'Login'}
           </button>
         </form>
-        
-        <div className="mt-4 text-xs text-gray-500 text-center">
-          
+
+        <div className="mt-4 text-center">
+          <button
+            type="button"
+            onClick={() => navigate('/apply')}
+            className="text-sm text-blue-600 hover:text-blue-800 underline underline-offset-2"
+          >
+            Join Our Crew
+          </button>
         </div>
       </div>
     </div>
