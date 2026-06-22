@@ -23,7 +23,7 @@ const payrollRoutes = require('./routes/payroll.routes')
 const branchRoutes = require('./routes/branch.routes')
 const timetableRoutes = require('./routes/timetable.routes')
 const taskRoutes = require('./routes/task.routes')
-const jobApplicationRoutes = require('./routes/jobapplication.routes')
+const jobapplicationRoutes = require('./routes/jobapplication.routes')
 
 app.use('/api/auth', authRoutes)
 app.use('/api/employees', employeeRoutes)
